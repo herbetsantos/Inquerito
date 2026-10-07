@@ -1,33 +1,32 @@
-document.getElementById('btn-extrair').addEventListener('click', async () => {
-  const statusDiv = document.getElementById('status');
-  statusDiv.innerText = 'Extraindo dados...';
-
+document.getElementById('btnExtrair').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   if (!tab) {
-    statusDiv.innerText = 'Erro: Nenhuma aba ativa.';
+    alert('Nenhuma aba ativa encontrada.');
     return;
   }
 
-  chrome.tabs.sendMessage(tab.id, { action: 'EXTRAIR_DADOS' }, (response) => {
-    if (chrome.runtime.lastError || !response || !response.sucesso) {
-      statusDiv.innerText = 'Navegue até a página de detalhes do imóvel no e-SUS PEC.';
+  chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ['content.js']
+  }, (results) => {
+    if (chrome.runtime.lastError) {
+      console.error(chrome.runtime.lastError);
+      alert('Erro ao injetar script na página.');
       return;
     }
 
-    const d = response.dados;
+    const dados = (results && results[0] && results[0].result) ? results[0].result : {};
+
     const params = new URLSearchParams({
-      endereco: d.endereco,
-      microarea: d.microarea,
-      telefone: d.telefone,
-      acs: d.acsNome,
-      responsavel: d.responsavelFamiliar,
-      dataVisitaPEC: d.dataVisitaPEC,
-      desfechoPEC: d.desfechoPEC
+      microarea: dados.microarea || '',
+      acs_nome: dados.acs_nome || '',
+      endereco_pec: dados.endereco_pec || '',
+      responsavel_familiar: dados.responsavel_familiar || '',
+      telefone_contato: dados.telefone_contato || ''
     });
 
-    // Redireciona para o Web App hospedado preenchendo a URL
-const appUrl = `https://inquerito.pages.dev/index.html?${params.toString()}`;
-    chrome.tabs.create({ url: appUrl });
+    const targetUrl = `https://inquerito.pages.dev/index.html?${params.toString()}`;
+    chrome.tabs.create({ url: targetUrl });
   });
 });
