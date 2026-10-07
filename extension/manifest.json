@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Coletor e-SUS PEC - Inquérito ACS",
+  "version": "1.0.0",
+  "description": "Extrai dados do imóvel, família e visitas do e-SUS PEC para o Inquérito Telefônico.",
+  "permissions": ["activeTab", "scripting"],
+  "content_scripts": [
+    {
+      "matches": ["*://*/gestaoCadastros/*", "*://*/*visualizarImovel/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Coletar Dados do e-SUS"
+  }
+}
