@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Painel de Gestão - Inquérito ACS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container-dashboard">
+    <header>
+      <h1>Painel de Auditoria e Gestão — Inquérito ACS</h1>
+      <span class="user-role">Perfil: Gestor</span>
+      <button id="btn-logout" style="float: right; padding: 5px 10px;">Sair</button>
+    </header>
+
+    <!-- Cards de Métricas -->
+    <div class="metrics-grid">
+      <div class="card-metric">
+        <h3>Total Entrevistas</h3>
+        <p id="total-inqueritos">0</p>
+      </div>
+      <div class="card-metric alerta">
+        <h3>Divergências Detectadas</h3>
+        <p id="total-divergencias">0</p>
+      </div>
+      <div class="card-metric">
+        <h3>Média Satisfação</h3>
+        <p id="media-satisfacao">0.0</p>
+      </div>
+    </div>
+
+    <!-- Tabela de Auditoria por ACS -->
+    <section>
+      <h2>Acompanhamento por Agente (ACS)</h2>
+      <table id="tabela-gestao">
+        <thead>
+          <tr>
+            <th>ACS</th>
+            <th>Microárea</th>
+            <th>Total Entrevistas</th>
+            <th>Visitas Confirmadas</th>
+            <th>Divergências (e-SUS x Paciente)</th>
+            <th>Média Mapeada</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Preenchido via API -->
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- SCRIPT DE AUTENTICAÇÃO E CARREGAMENTO DE DADOS -->
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Verificação de Permissão de Acesso
+      const token = localStorage.getItem('token_inquerito');
+      const perfil = localStorage.getItem('perfil_inquerito');
+
+      if (!token || perfil !== 'gestor') {
+        alert('Acesso restrito ao Perfil de Gestão.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      // 2. Botão de Logout
+      document.getElementById('btn-logout').addEventListener('click', () => {
+        localStorage.clear();
+        window.location.href = 'login.html';
+      });
+
+      // 3. Carregamento dos dados da API protegida
+      try {
+        const res = await fetch('/api/gestao/metricas', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (res.status === 401 || res.status === 403) {
+          alert('Sessão expirada. Faça login novamente.');
+          localStorage.clear();
+          window.location.href = 'login.html';
+          return;
+        }
+
+        const data = await res.json();
+
+        // Atualiza os cards com as métricas
+        document.getElementById('total-inqueritos').innerText = data.totalInqueritos;
+        document.getElementById('total-divergencias').innerText = data.totalDivergencias;
+        document.getElementById('media-satisfacao').innerText = data.mediaSatisfacao;
+
+      } catch (err) {
+        console.error('Erro ao carregar métricas:', err);
+      }
+    });
+  </script>
+</body>
+</html>

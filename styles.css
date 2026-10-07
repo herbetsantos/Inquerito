@@ -1,0 +1,21 @@
+body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+.container, .container-dashboard { max-width: 800px; margin: 0 auto; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+fieldset { border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+legend { font-weight: bold; color: #003A79; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+div { margin-bottom: 10px; }
+label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+.input-pec { background-color: #eef4fc; font-weight: bold; }
+.btn-salvar { width: 100%; padding: 12px; background: #28a745; color: white; border: none; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+.badge-alerta { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; border: 1px solid #f5c6cb; margin-top: 10px; }
+.hidden { display: none; }
+
+/* Dashboard */
+.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.card-metric { background: #f8f9fa; padding: 16px; border-radius: 6px; text-align: center; border-left: 4px solid #0069D0; }
+.card-metric.alerta { border-left-color: #dc3545; }
+.card-metric p { font-size: 24px; font-weight: bold; margin: 8px 0 0 0; }
+table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+th { background: #f1f3f5; }
