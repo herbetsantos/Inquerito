@@ -27,7 +27,7 @@ document.getElementById('btn-extrair').addEventListener('click', async () => {
     });
 
     // Redireciona para o Web App hospedado preenchendo a URL
-    const appUrl = `https://inquerito-acs.pages.dev/index.html?${params.toString()}`;
+const appUrl = `https://inquerito.pages.dev/index.html?${params.toString()}`;
     chrome.tabs.create({ url: appUrl });
   });
 });
