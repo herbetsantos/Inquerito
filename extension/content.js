@@ -1,63 +1,92 @@
-(() => {
-  // Função de extração de dados
-  const extrairDados = () => {
-    const obterTexto = (seletor) => {
-      const el = document.querySelector(seletor);
-      return el ? el.innerText.trim() : '';
-    };
-
-    return {
-      microarea: obterTexto('.campo-microarea, #microarea, [data-microarea]'),
-      acs_nome: obterTexto('.campo-acs, #nomeAcs, [data-acs]'),
-      endereco_pec: obterTexto('.campo-endereco, #endereco, [data-endereco]'),
-      responsavel_familiar: obterTexto('.campo-responsavel, #responsavel, [data-responsavel]'),
-      telefone_contato: obterTexto('.campo-telefone, #telefone, [data-telefone]')
-    };
+// ==========================================================================
+// 1. Função de Extração de Dados do e-SUS PEC
+// ==========================================================================
+function extrairDadosPEC() {
+  // Ajuste os seletores conforme os IDs/classes reais presentes no seu e-SUS PEC
+  const extrairTexto = (seletor) => {
+    const el = document.querySelector(seletor);
+    return el ? el.innerText.trim() : '';
   };
 
-  // Injeta o botão flutuante contínuo na tela se ele ainda não existir
-  if (!document.getElementById('btn-inquerito-sus')) {
-    const btn = document.createElement('button');
-    btn.id = 'btn-inquerito-sus';
-    btn.innerHTML = '📞 Iniciar Inquérito';
+  return {
+    microarea: extrairTexto('#microarea, .microarea-val, [data-microarea]') || '',
+    acs_nome: extrairTexto('#nome-acs, .acs-nome-val') || '',
+    endereco_pec: extrairTexto('#endereco, .endereco-val') || '',
+    responsavel_familiar: extrairTexto('#responsavel, .responsavel-val') || '',
+    telefone_contato: extrairTexto('#telefone, .telefone-val') || ''
+  };
+}
 
-    Object.assign(btn.style, {
-      position: 'fixed',
-      bottom: '20px',
-      right: '20px',
-      zIndex: '999999',
-      padding: '12px 20px',
-      backgroundColor: '#0284c7',
-      color: '#ffffff',
-      border: 'none',
-      borderRadius: '25px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-      fontWeight: 'bold',
-      fontSize: '14px',
-      cursor: 'pointer',
-      transition: 'transform 0.2s, background-color 0.2s'
-    });
+// ==========================================================================
+// 2. Injeção e Estilização do Botão Flutuante (Visual eMulti / e-SUS)
+// ==========================================================================
+function injetarBotaoFlutuante() {
+  if (document.getElementById('btn-inquerito-esus')) return;
 
-    btn.onmouseover = () => btn.style.transform = 'scale(1.05)';
-    btn.onmouseout = () => btn.style.transform = 'scale(1)';
+  const floatBtn = document.createElement('button');
+  floatBtn.id = 'btn-inquerito-esus';
+  floatBtn.innerHTML = '📞 Iniciar Inquérito';
 
-    btn.onclick = () => {
-      const dados = extrairDados();
-      const params = new URLSearchParams({
-        microarea: dados.microarea || '',
-        acs_nome: dados.acs_nome || '',
-        endereco_pec: dados.endereco_pec || '',
-        responsavel_familiar: dados.responsavel_familiar || '',
-        telefone_contato: dados.telefone_contato || ''
-      });
+  // Estilização isolada (evita conflito com o CSS nativo do PEC)
+  Object.assign(floatBtn.style, {
+    position: 'fixed',
+    bottom: '24px',
+    right: '24px',
+    zIndex: '999999',
+    backgroundColor: '#0284c7',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '12px 20px',
+    fontSize: '14px',
+    fontWeight: '600',
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  });
 
-      const appUrl = `https://inquerito.pages.dev/index.html?${params.toString()}`;
-      window.open(appUrl, '_blank');
-    };
+  // Efeitos visuais de interação
+  floatBtn.addEventListener('mouseenter', () => {
+    floatBtn.style.backgroundColor = '#0369a1';
+    floatBtn.style.transform = 'translateY(-2px)';
+    floatBtn.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.2)';
+  });
 
-    document.body.appendChild(btn);
-  }
+  floatBtn.addEventListener('mouseleave', () => {
+    floatBtn.style.backgroundColor = '#0284c7';
+    floatBtn.style.transform = 'translateY(0)';
+    floatBtn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+  });
 
-  // Retorna os dados capturados para o popup.js caso seja acionado via botão da extensão
-  return extrairDados();
-})();
+  // Ação ao clicar: captura os dados e abre o Web-App no Cloudflare Pages
+  floatBtn.addEventListener('click', () => {
+    const dados = extrairDadosPEC();
+    const params = new URLSearchParams(dados).toString();
+    const urlWebApp = `https://inquerito.pages.dev/index.html?${params}`;
+
+    window.open(urlWebApp, '_blank');
+  });
+
+  document.body.appendChild(floatBtn);
+}
+
+// ==========================================================================
+// 3. Execução Contínua / Monitoramento da DOM
+// ==========================================================================
+// Executa na carga inicial
+injetarBotaoFlutuante();
+
+// O e-SUS utiliza navegação dinâmica (SPA/AJAX). O Observer garante que o botão
+// permaneça visível mesmo ao mudar de tela/paciente sem recarregar a página.
+const observer = new MutationObserver(() => {
+  injetarBotaoFlutuante();
+});
+
+observer.observe(document.body, {
+  childList: true,
+  subtree: true
+});
