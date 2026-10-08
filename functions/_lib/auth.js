@@ -85,15 +85,18 @@ export const PERMISSOES = Object.freeze({
     'gestao.visualizar',
     'auditoria.visualizar',
     'usuarios.visualizar',
-    'usuarios.gerenciar'
+    'usuarios.gerenciar',
+    'dados.exportar'
   ]),
   gestor: Object.freeze([
     'inquerito.registrar',
-    'gestao.visualizar'
+    'gestao.visualizar',
+    'dados.exportar'
   ]),
   auditor: Object.freeze([
     'inquerito.registrar',
-    'auditoria.visualizar'
+    'auditoria.visualizar',
+    'dados.exportar'
   ]),
   operador: Object.freeze([
     'inquerito.registrar'

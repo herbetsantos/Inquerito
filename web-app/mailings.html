@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mailing territorial — Inquérito ACS</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+.selection{display:grid;grid-template-columns:1fr 1fr;gap:12px}.checklist{max-height:240px;overflow:auto;border:1px solid #ddd;border-radius:8px;padding:10px}
+.check{display:flex;gap:8px;padding:5px}.summary{display:flex;gap:12px;flex-wrap:wrap}.stat{padding:12px 16px;border:1px solid #ddd;border-radius:10px;background:#fff}
+</style>
+</head>
+<body>
+<header class="app-topbar"><div class="app-brand"><strong>Inquérito</strong><span class="app-brand__divider"></span><span>ACS</span></div>
+<div class="app-actions"><span class="user-role">Administrador</span><a class="btn btn-secondary" href="admin.html">Usuários</a><a class="btn btn-secondary" href="dashboard.html">Painel</a><button id="logout" class="btn btn-secondary">Sair</button></div></header>
+<main class="page">
+<div class="page__head"><div><div class="eyebrow">Gestão territorial</div><h1 class="page__title">Mailing de inquéritos</h1></div></div>
+<section class="panel">
+<h2>1. Importar população da extensão</h2>
+<p>Abra no e-SUS a tela <strong>Acompanhamento do território</strong>, use a extensão para selecionar as microáreas e gerar o mailing. Depois clique abaixo.</p>
+<button id="importar" class="btn btn-primary">↥ Importar mailing da extensão</button>
+<div id="import-status" class="erro-msg hidden"></div>
+</section>
+<section class="panel">
+<h2>2. Definir composição da campanha</h2>
+<div class="form-grid">
+<div class="form-group"><label>Nome da campanha *</label><input id="nome" placeholder="Inquérito Territorial — Outubro/2026"></div>
+<div class="form-group"><label>Unidade</label><input id="unidade" readonly></div>
+</div>
+<div><div><label><strong>Composição por equipe e microárea</strong></label><div id="composicao" class="checklist">Importe o mailing primeiro.</div></div></div>
+<button id="criar" class="btn btn-primary" style="margin-top:12px">Criar campanha e gerar mailing</button>
+</section>
+<section class="panel">
+<h2>Campanhas existentes</h2><div id="mailing-detalhe" class="panel hidden" style="margin:12px 0 0"><h3 id="detalhe-titulo">Itens do mailing</h3><div class="table-wrap"><table id="tabela-itens"><thead><tr><th>Paciente</th><th>Equipe</th><th>Microárea</th><th>Telefone</th><th>Status</th><th>Última visita</th></tr></thead><tbody></tbody></table></div><div id="detalhe-paginacao" style="margin-top:10px"></div></div>
+<div class="table-wrap"><table id="tabela"><thead><tr><th>Campanha</th><th>Unidade</th><th>Total</th><th>Concluídos</th><th>Pendentes</th><th>Status</th><th>Exportar</th></tr></thead><tbody></tbody></table></div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id); let importado=null;
+function msg(t,ok=false){$('import-status').textContent=t;$('import-status').classList.remove('hidden');$('import-status').style.background=ok?'#eaf7ee':'';}
+function renderSelecao(){
+ const mapa={};
+ (importado?.itens||[]).forEach(x=>{const e=x.equipe||'Equipe não identificada';const m=x.microarea||'Microárea não identificada';(mapa[e]??=new Set()).add(m);});
+ $('composicao').innerHTML=Object.entries(mapa).sort().map(([e,set])=>{
+   const micros=[...set].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+   return `<div style="margin-bottom:10px"><strong>${esc(e)}</strong>`+
+     `<label class="check"><input type="checkbox" class="eq-all" data-equipe="${esc(e)}"> Todas as microáreas</label>`+
+     micros.map(m=>`<label class="check"><input type="checkbox" class="pair" data-equipe="${esc(e)}" value="${esc(m)}" checked> Microárea ${esc(m)}</label>`).join('')+
+     `</div>`;
+ }).join('')||'Nenhuma composição identificada.';
+ document.querySelectorAll('.eq-all').forEach(cb=>cb.onchange=()=>{
+   document.querySelectorAll('.pair').forEach(p=>{if(p.dataset.equipe===cb.dataset.equipe)p.checked=cb.checked;});
+ });
+}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+window.addEventListener('message',e=>{
+ if(e.source!==window||e.data?.source!=='inquerito-extension')return;
+ if(e.data.action==='mailingResponse'){
+  const r=e.data.payload;if(!r?.ok||!r.mailing){msg('A extensão não possui um mailing salvo. Abra o e-SUS e gere o mailing pela extensão.');return;}
+  importado=r.mailing;$('unidade').value=importado.contexto?.unidade||importado.itens?.[0]?.unidade||'';
+  msg(`Recebidos ${importado.itens.length} registros da extensão. Selecione a composição e crie a campanha.`,true);renderSelecao();
+ }
+});
+$('importar').onclick=()=>{window.postMessage({source:'inquerito-admin',action:'getMailingFromExtension'},'*');msg('Solicitando os dados à extensão…');};
+$('criar').onclick=async()=>{
+ if(!importado?.itens?.length)return msg('Importe primeiro o mailing da extensão.');
+ const selecoes=[...document.querySelectorAll('.pair:checked')].map(x=>({equipe:x.dataset.equipe,microarea:x.value}));
+ if(!selecoes.length)return msg('Selecione ao menos uma equipe e uma microárea.');
+ const nome=$('nome').value.trim();if(!nome)return msg('Informe o nome da campanha.');
+ const r=await fetch('/api/admin/campanhas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome,unidade:$('unidade').value,composicao:{selecoes}})});
+ const d=await r.json().catch(()=>({}));if(!r.ok)return msg(d.mensagem||'Erro ao criar campanha.');
+ const ri=await fetch('/api/admin/campanhas/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campanha_id:d.id,itens:importado.itens})});
+ const di=await ri.json().catch(()=>({}));if(!ri.ok)return msg(di.mensagem||'Campanha criada, mas houve erro na importação.');
+ msg(`${di.mensagem} A campanha está disponível para gestão.`,true);carregar();
+};
+async function verMailing(c){
+ const box=$('mailing-detalhe'); box.classList.remove('hidden'); $('detalhe-titulo').textContent=`Itens do mailing — ${c.nome}`;
+ const r=await fetch(`/api/admin/campanhas/itens?campanha_id=${encodeURIComponent(c.id)}&limit=500`); const d=await r.json().catch(()=>({}));
+ if(!r.ok){ $('tabela-itens').querySelector('tbody').innerHTML=`<tr><td colspan=6>${esc(d.mensagem||'Erro ao carregar mailing.')}</td></tr>`; return; }
+ $('tabela-itens').querySelector('tbody').innerHTML=(d.itens||[]).map(x=>`<tr><td>${esc(x.nome_paciente||'—')}</td><td>${esc(x.equipe||'—')}</td><td>${esc(x.microarea||'—')}</td><td>${esc(x.telefone||'—')}</td><td>${esc(x.status||'—')}</td><td>${esc(x.ultima_visita||'—')}</td></tr>`).join('')||'<tr><td colspan=6>Nenhum item importado.</td></tr>';
+ $('detalhe-paginacao').textContent=`Exibindo ${d.itens?.length||0} registros (máximo de 500 nesta visualização).`;
+ box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function carregar(){const r=await fetch('/api/admin/campanhas');if(!r.ok)return;const d=await r.json();$('tabela').querySelector('tbody').innerHTML=(d.campanhas||[]).map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.unidade||'—')}</td><td>${c.total||0}</td><td>${c.concluidos||0}</td><td>${c.pendentes||0}</td><td>${esc(c.status)}</td><td><button class="btn btn-secondary" type="button" data-campanha="${c.id}">Ver</button> <a class="btn btn-secondary" href="/api/export/mailing.csv?campanha_id=${encodeURIComponent(c.id)}">CSV</a></td></tr>`).join(''); document.querySelectorAll('[data-campanha]').forEach(b=>b.onclick=()=>{const c=(d.campanhas||[]).find(x=>String(x.id)===b.dataset.campanha);if(c)verMailing(c);}); const q=new URLSearchParams(location.search).get('campanha_id'); if(q){const c=(d.campanhas||[]).find(x=>String(x.id)===q);if(c)verMailing(c);}}
+$('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST'});location.href='index.html';};
+(async()=>{const r=await fetch('/api/me');const u=await r.json().catch(()=>({}));if(!r.ok||u.perfil!=='admin')location.href='inquerito.html';else carregar();})();
+</script>
+</body></html>
