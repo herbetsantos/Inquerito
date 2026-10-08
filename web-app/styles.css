@@ -302,3 +302,65 @@ tbody tr:hover { background: var(--surface); }
 .form-group--full { grid-column:1/-1; }
 .form-group small { display:block; margin-top:6px; color:#667085; font-size:12px; }
 @media (max-width:700px) { .admin-head { align-items:stretch; flex-direction:column; } .modal-card { padding:18px; } }
+
+
+/* Checkbox e radio: não herdam o estilo de campo de texto */
+input[type="checkbox"], input[type="radio"] {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Títulos dentro de painéis */
+.panel > h2 { font-size: 17px; font-weight: 700; color: var(--primary-dark); margin: 0 0 14px; }
+.panel h3 { font-size: 15px; font-weight: 700; color: var(--primary-dark); margin: 0 0 10px; }
+.panel > p { color: var(--muted); margin: 0 0 16px; }
+.panel > p strong { color: var(--ink); }
+
+/* Mensagens: erro (padrão), sucesso e informação */
+.erro-msg.ok { background: #e1f4ed; color: var(--accent-dark); }
+.erro-msg.info { background: var(--tint); color: var(--primary); }
+
+/* Mailing: composição por equipe e microárea */
+.checklist {
+  max-height: 280px;
+  overflow: auto;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 14px;
+  background: #fff;
+  color: var(--muted);
+}
+.checklist > div { padding: 12px 0; border-bottom: 1px solid var(--line); margin: 0 !important; }
+.checklist > div:last-child { border-bottom: 0; }
+.checklist strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--primary-dark);
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 6px 2px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+}
+.check:hover { color: var(--primary); }
+.check:has(.eq-all) { font-weight: 700; }
+
+.selection { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.summary { display: flex; gap: 12px; flex-wrap: wrap; }
+.stat { padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+@media (max-width: 760px) { .selection { grid-template-columns: 1fr; } }
