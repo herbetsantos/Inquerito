@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "e-SUS PEC - Extensão de Inquérito",
-  "version": "2.4.0",
+  "version": "2.7.0",
   "description": "Captura estruturada do acompanhamento territorial do e-SUS PEC e gera mailing territorial para o Inquérito ACS.",
   "permissions": [
     "activeTab",
