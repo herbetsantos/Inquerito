@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mailing territorial — Inquérito ACS</title>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <header class="app-topbar"><div class="app-brand"><strong>Inquérito</strong><span class="app-brand__divider"></span><span>ACS</span></div>
@@ -35,16 +35,23 @@ const $=id=>document.getElementById(id); let importado=null;
 function msg(t,tipo='erro'){const el=$('import-status');if(tipo===true)tipo='ok';el.textContent=t;el.className='erro-msg'+(tipo==='ok'||tipo==='info'?' '+tipo:'');}
 function renderSelecao(){
  const mapa={};
- (importado?.itens||[]).forEach(x=>{const e=x.equipe||'Equipe não identificada';const m=x.microarea||'Microárea não identificada';(mapa[e]??=new Set()).add(m);});
- $('composicao').innerHTML=Object.entries(mapa).sort().map(([e,set])=>{
-   const micros=[...set].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
-   return `<div style="margin-bottom:10px"><strong>${esc(e)}</strong>`+
-     `<label class="check"><input type="checkbox" class="eq-all" data-equipe="${esc(e)}"> Todas as microáreas</label>`+
-     micros.map(m=>`<label class="check"><input type="checkbox" class="pair" data-equipe="${esc(e)}" value="${esc(m)}" checked> Microárea ${esc(m)}</label>`).join('')+
+ (importado?.itens||[]).forEach(x=>{const e=x.equipe||'Equipe não identificada';const m=x.microarea||'Microárea não identificada';mapa[e]??={};mapa[e][m]=(mapa[e][m]||0)+1;});
+ const rotulo=m=>/^micro/i.test(m)?m:`Microárea ${m}`;
+ $('composicao').innerHTML=Object.entries(mapa).sort().map(([e,micros])=>{
+   const lista=Object.keys(micros).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+   const total=lista.reduce((s,m)=>s+micros[m],0);
+   return `<div class="equipe"><strong>${esc(e)} <span class="count">${total} registros</span></strong>`+
+     `<label class="check todas"><input type="checkbox" class="eq-all" data-equipe="${esc(e)}" checked> Todas as microáreas</label>`+
+     lista.map(m=>`<label class="check"><input type="checkbox" class="pair" data-equipe="${esc(e)}" value="${esc(m)}" checked> ${esc(rotulo(m))} <span class="count">${micros[m]}</span></label>`).join('')+
      `</div>`;
  }).join('')||'Nenhuma composição identificada.';
  document.querySelectorAll('.eq-all').forEach(cb=>cb.onchange=()=>{
    document.querySelectorAll('.pair').forEach(p=>{if(p.dataset.equipe===cb.dataset.equipe)p.checked=cb.checked;});
+ });
+ document.querySelectorAll('.pair').forEach(p=>p.onchange=()=>{
+   const doGrupo=[...document.querySelectorAll('.pair')].filter(x=>x.dataset.equipe===p.dataset.equipe);
+   const all=[...document.querySelectorAll('.eq-all')].find(x=>x.dataset.equipe===p.dataset.equipe);
+   if(all)all.checked=doGrupo.every(x=>x.checked);
  });
 }
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
