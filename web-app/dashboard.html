@@ -12,15 +12,15 @@
   <header class="app-topbar">
     <div class="app-brand"><strong>Inquérito</strong><span class="app-brand__divider"></span><span>ACS</span></div>
     <div class="app-actions">
-      <span class="user-role">Perfil: Gestão</span>
+      <span id="user-role" class="user-role">Perfil</span>
       <button id="btn-logout" type="button" class="btn btn-secondary">Sair</button>
     </div>
   </header>
 
   <div class="page">
     <div class="page__head">
-      <div class="eyebrow">Gestão</div>
-      <h1 class="page__title">Painel de Auditoria e Gestão</h1>
+      <div id="page-eyebrow" class="eyebrow">Gestão</div>
+      <h1 id="page-title" class="page__title">Painel de Gestão</h1>
     </div>
 
     <!-- Cards de Métricas -->
@@ -33,7 +33,7 @@
         <h3>Divergências Detectadas</h3>
         <p id="total-divergencias">0</p>
       </div>
-      <div class="card-metric">
+      <div id="card-satisfacao" class="card-metric">
         <h3>Média Satisfação</h3>
         <p id="media-satisfacao">0.0</p>
       </div>
@@ -72,14 +72,29 @@
       });
 
       try {
-        const res = await fetch('/api/gestao/metricas');
+        const me = await fetch('/api/me');
+        if (me.status === 401) { voltar(); return; }
+        if (!me.ok) { window.location.href = 'inquerito.html'; return; }
+        const eu = await me.json();
+
+        const ehAuditor = eu.perfil === 'auditor';
+        document.getElementById('user-role').innerText = 'Perfil: ' + (eu.perfil === 'admin' ? 'Administrador' : eu.perfil === 'gestor' ? 'Gestão' : 'Auditoria');
+        document.getElementById('page-eyebrow').innerText = ehAuditor ? 'Auditoria' : eu.perfil === 'admin' ? 'Administração' : 'Gestão';
+        document.getElementById('page-title').innerText = ehAuditor ? 'Painel de Auditoria' : eu.perfil === 'admin' ? 'Painel de Administração e Gestão' : 'Painel de Gestão';
+
+        const endpoint = ehAuditor ? '/api/auditoria/metricas' : '/api/gestao/metricas';
+        const res = await fetch(endpoint);
         if (res.status === 401) { voltar(); return; }
-        if (res.status === 403) { alert('Acesso restrito ao perfil de gestão.'); window.location.href = 'inquerito.html'; return; }
+        if (res.status === 403) { alert('Acesso não autorizado para este perfil.'); window.location.href = 'inquerito.html'; return; }
         const data = await res.json();
 
         document.getElementById('total-inqueritos').innerText = data.totalInqueritos;
         document.getElementById('total-divergencias').innerText = data.totalDivergencias;
-        document.getElementById('media-satisfacao').innerText = data.mediaSatisfacao ?? '—';
+        if (ehAuditor) {
+          document.getElementById('card-satisfacao').classList.add('hidden');
+        } else {
+          document.getElementById('media-satisfacao').innerText = data.mediaSatisfacao ?? '—';
+        }
 
         const tbody = document.querySelector('#tabela-gestao tbody');
         (data.porAcs || []).forEach((r) => {

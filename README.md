@@ -9,7 +9,7 @@ npx wrangler d1 execute inquerito-db --local --file=database/schema.sql
 npx wrangler d1 execute inquerito-db --local --file=database/seeds.sql
 npx wrangler pages dev web-app --d1 DB=<database_id do wrangler.toml>
 ```
-Usuários de teste (senha `123456`): admin `11122233344`, operador `55566677788`.
+Usuários de teste (senha `123456`): admin `11122233344`, operador `55566677788`, gestor `22233344455`, auditor `33344455566`.
 
 ## Produção
 ```bash

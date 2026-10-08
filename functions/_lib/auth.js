@@ -76,6 +76,34 @@ export function cookieLimpo(request) {
 }
 export const HORAS_SESSAO = HORAS;
 
+// Matriz de autorização centralizada.
+// O frontend pode ocultar funcionalidades, mas a autorização efetiva
+// permanece sempre no servidor por meio de exigirPermissao().
+export const PERMISSOES = Object.freeze({
+  admin: Object.freeze([
+    'inquerito.registrar',
+    'gestao.visualizar',
+    'auditoria.visualizar',
+    'usuarios.visualizar',
+    'usuarios.gerenciar'
+  ]),
+  gestor: Object.freeze([
+    'inquerito.registrar',
+    'gestao.visualizar'
+  ]),
+  auditor: Object.freeze([
+    'inquerito.registrar',
+    'auditoria.visualizar'
+  ]),
+  operador: Object.freeze([
+    'inquerito.registrar'
+  ])
+});
+
+export function perfilTemPermissao(perfil, permissao) {
+  return Boolean(PERMISSOES[perfil]?.includes(permissao));
+}
+
 function lerCookie(request, nome) {
   const m = (request.headers.get('Cookie') || '').match(new RegExp(`(?:^|;\\s*)${nome}=([^;]+)`));
   return m ? m[1] : null;
@@ -97,6 +125,16 @@ export async function exigirAuth(request, env, perfisPermitidos = null) {
   const usuario = token ? await verificarJWT(token, env.JWT_SECRET) : null;
   if (!usuario) return { erro: json({ mensagem: 'Sessão inválida ou expirada.' }, 401) };
   if (perfisPermitidos && !perfisPermitidos.includes(usuario.perfil)) {
+    return { erro: json({ mensagem: 'Acesso negado para o seu perfil.' }, 403) };
+  }
+  return { usuario };
+}
+
+// Autorização por permissão funcional. Mantém exigirAuth() compatível com APIs existentes.
+export async function exigirPermissao(request, env, permissao) {
+  const { usuario, erro } = await exigirAuth(request, env);
+  if (erro) return { erro };
+  if (!perfilTemPermissao(usuario.perfil, permissao)) {
     return { erro: json({ mensagem: 'Acesso negado para o seu perfil.' }, 403) };
   }
   return { usuario };
