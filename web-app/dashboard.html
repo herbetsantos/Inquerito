@@ -3,15 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <title>Painel de Gestão - Inquérito ACS</title>
+  <link rel="stylesheet" href="https://cdngovbr-ds.estaleiro.serpro.gov.br/design-system/fonts/rawline/css/rawline.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container-dashboard">
-    <header>
+  <header>
       <h1>Painel de Auditoria e Gestão — Inquérito ACS</h1>
-      <span class="user-role">Perfil: Gestor</span>
-      <button id="btn-logout" style="float: right; padding: 5px 10px;">Sair</button>
+      <span class="user-role">Perfil: Gestão</span>
+      <button id="btn-logout" type="button" class="btn btn-secondary">Sair</button>
     </header>
+
+  <div class="container-dashboard">
 
     <!-- Cards de Métricas -->
     <div class="metrics-grid">
@@ -50,47 +52,33 @@
     </section>
   </div>
 
-  <!-- SCRIPT DE AUTENTICAÇÃO E CARREGAMENTO DE DADOS -->
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
-      // 1. Verificação de Permissão de Acesso
-      const token = localStorage.getItem('token_inquerito');
-      const perfil = localStorage.getItem('perfil_inquerito');
+      const voltar = () => { window.location.href = 'index.html'; };
 
-      if (!token || perfil !== 'gestor') {
-        alert('Acesso restrito ao Perfil de Gestão.');
-        window.location.href = 'login.html';
-        return;
-      }
-
-      // 2. Botão de Logout
-      document.getElementById('btn-logout').addEventListener('click', () => {
-        localStorage.clear();
-        window.location.href = 'login.html';
+      document.getElementById('btn-logout').addEventListener('click', async () => {
+        await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+        voltar();
       });
 
-      // 3. Carregamento dos dados da API protegida
       try {
-        const res = await fetch('/api/gestao/metricas', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (res.status === 401 || res.status === 403) {
-          alert('Sessão expirada. Faça login novamente.');
-          localStorage.clear();
-          window.location.href = 'login.html';
-          return;
-        }
-
+        const res = await fetch('/api/gestao/metricas');
+        if (res.status === 401) { voltar(); return; }
+        if (res.status === 403) { alert('Acesso restrito ao perfil de gestão.'); window.location.href = 'inquerito.html'; return; }
         const data = await res.json();
 
-        // Atualiza os cards com as métricas
         document.getElementById('total-inqueritos').innerText = data.totalInqueritos;
         document.getElementById('total-divergencias').innerText = data.totalDivergencias;
-        document.getElementById('media-satisfacao').innerText = data.mediaSatisfacao;
+        document.getElementById('media-satisfacao').innerText = data.mediaSatisfacao ?? '—';
 
+        const tbody = document.querySelector('#tabela-gestao tbody');
+        (data.porAcs || []).forEach((r) => {
+          const tr = document.createElement('tr');
+          [r.acs_nome, r.microarea, r.total, r.confirmadas, r.divergencias,
+           r.media != null ? Number(r.media).toFixed(1) : '—']
+            .forEach((v) => { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+          tbody.appendChild(tr);
+        });
       } catch (err) {
         console.error('Erro ao carregar métricas:', err);
       }

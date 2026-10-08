@@ -2,66 +2,66 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Acesso Restrito — Inquérito ACS</title>
+  <link rel="stylesheet" href="https://cdngovbr-ds.estaleiro.serpro.gov.br/design-system/fonts/rawline/css/rawline.css">
   <link rel="stylesheet" href="styles.css">
-  <style>
-    .login-card { max-width: 380px; margin: 80px auto; padding: 24px; background: #fff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-    .login-card h2 { text-align: center; color: #003A79; margin-bottom: 20px; }
-    .btn-login { width: 100%; padding: 10px; background-color: #0069D0; color: white; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; }
-    .btn-login:hover { background-color: #0052a3; }
-    .erro-msg { color: #dc3545; font-size: 13px; margin-top: 10px; text-align: center; }
-  </style>
 </head>
 <body>
   <div class="login-card">
-    <h2>Autenticação</h2>
+    <div class="marca">eMulti · Atenção Primária</div>
+    <h2>Inquérito ACS</h2>
     <form id="form-login">
-      <div>
-        <label>Utilizador / CPF:</label>
-        <input type="text" id="usuario" required autocomplete="username">
-      </div>
-      <div>
-        <label>Palavra-passe:</label>
-        <input type="password" id="senha" required autocomplete="current-password">
-      </div>
+      <div class="form-group"><label for="usuario">CPF</label>
+      <input type="text" id="usuario" inputmode="numeric" required autocomplete="username"></div>
+      <div class="form-group"><label for="senha">Senha</label>
+      <input type="password" id="senha" required autocomplete="current-password"></div>
       <button type="submit" class="btn-login">Entrar</button>
-      <div id="msg-erro" class="erro-msg hidden"></div>
+      <div id="msg-erro" class="erro-msg hidden" role="alert"></div>
     </form>
   </div>
 
   <script>
+    // Dados vindos da extensão (#microarea=...) são preservados após o login.
+    const fragmento = window.location.hash;
+
+    function destino(perfil) {
+      if (fragmento.length <= 1 && ['admin', 'gestor', 'auditor'].includes(perfil)) return 'dashboard.html';
+      return 'inquerito.html' + fragmento;
+    }
+
+    // Já tem sessão válida? Segue direto.
+    fetch('/api/me').then((r) => (r.ok ? r.json() : null)).then((u) => {
+      if (u) window.location.replace(destino(u.perfil));
+    }).catch(() => {});
+
     document.getElementById('form-login').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const usuario = document.getElementById('usuario').value;
-      const senha = document.getElementById('senha').value;
       const msgErro = document.getElementById('msg-erro');
-
+      const botao = e.target.querySelector('button[type=submit]');
+      msgErro.classList.add('hidden');
+      botao.disabled = true;
       try {
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usuario, senha })
+          body: JSON.stringify({
+            usuario: document.getElementById('usuario').value,
+            senha: document.getElementById('senha').value
+          })
         });
-
-        const data = await res.json();
-
-        if (res.ok && data.token) {
-          localStorage.setItem('token_inquerito', data.token);
-          localStorage.setItem('perfil_inquerito', data.perfil);
-
-          // Redireciona conforme o perfil
-          if (data.perfil === 'gestor') {
-            window.location.href = 'dashboard.html';
-          } else {
-            window.location.href = 'index.html' + window.location.search;
-          }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          window.location.href = destino(data.perfil);
         } else {
-          msgErro.innerText = data.mensagem || 'Credenciais inválidas.';
+          msgErro.innerText = data.mensagem || `Falha no login (HTTP ${res.status}).`;
           msgErro.classList.remove('hidden');
         }
       } catch (err) {
         msgErro.innerText = 'Erro ao conectar ao servidor.';
         msgErro.classList.remove('hidden');
+      } finally {
+        botao.disabled = false;
       }
     });
   </script>

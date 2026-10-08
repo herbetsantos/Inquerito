@@ -1,32 +1,37 @@
+// Endereço do web-app publicado no Cloudflare Pages
+const URL_WEBAPP = 'https://inquerito.pages.dev/';
+
+// Executada DENTRO da página do e-SUS PEC (somente quando o usuário clica no botão).
+// Ajuste os seletores conforme os IDs/classes reais da sua tela do PEC.
+function extrairDadosPEC() {
+  const t = (seletor) => {
+    const el = document.querySelector(seletor);
+    return el ? el.innerText.trim() : '';
+  };
+  return {
+    microarea: t('#microarea, .microarea-val, [data-microarea]'),
+    acs_nome: t('#nome-acs, .acs-nome-val'),
+    endereco_pec: t('#endereco, .endereco-val'),
+    responsavel_familiar: t('#responsavel, .responsavel-val'),
+    telefone_contato: t('#telefone, .telefone-val')
+  };
+}
+
 document.getElementById('btnExtrair').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab) { alert('Nenhuma aba ativa encontrada.'); return; }
 
-  if (!tab) {
-    alert('Nenhuma aba ativa encontrada.');
+  let dados = {};
+  try {
+    const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: extrairDadosPEC });
+    dados = (res && res.result) || {};
+  } catch (err) {
+    console.error(err);
+    alert('Não foi possível ler esta página.');
     return;
   }
 
-  chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    files: ['content.js']
-  }, (results) => {
-    if (chrome.runtime.lastError) {
-      console.error(chrome.runtime.lastError);
-      alert('Erro ao injetar script na página.');
-      return;
-    }
-
-    const dados = (results && results[0] && results[0].result) ? results[0].result : {};
-
-    const params = new URLSearchParams({
-      microarea: dados.microarea || '',
-      acs_nome: dados.acs_nome || '',
-      endereco_pec: dados.endereco_pec || '',
-      responsavel_familiar: dados.responsavel_familiar || '',
-      telefone_contato: dados.telefone_contato || ''
-    });
-
-    const targetUrl = `https://inquerito.pages.dev/index.html?${params.toString()}`;
-    chrome.tabs.create({ url: targetUrl });
-  });
+  // Dados pessoais vão no FRAGMENTO (#): não são enviados ao servidor, nem em logs ou Referer.
+  const fragmento = new URLSearchParams(dados).toString();
+  chrome.tabs.create({ url: `${URL_WEBAPP}index.html#${fragmento}` });
 });

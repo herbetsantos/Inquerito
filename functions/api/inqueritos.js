@@ -1,62 +1,41 @@
-export async function onRequestPost(context) {
+import { json, exigirAuth } from '../_lib/auth.js';
+
+const STATUS_VALIDOS = ['atendeu', 'nao_atendeu', 'numero_invalido', 'recusou', 'caixa_postal'];
+const txt = (v, max) => (v == null || v === '' ? null : String(v).trim().slice(0, max));
+
+export async function onRequestPost({ request, env }) {
+  const { usuario, erro } = await exigirAuth(request, env);
+  if (erro) return erro;
+
   try {
-    const { request, env } = context;
-    const data = await request.json();
-
-    if (!env.DB) {
-      return new Response(JSON.stringify({ error: 'Binding do D1 não configurado.' }), { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json' } 
-      });
+    const d = await request.json().catch(() => null);
+    if (!d) return json({ mensagem: 'JSON inválido.' }, 400);
+    if (!STATUS_VALIDOS.includes(d.status_ligacao)) {
+      return json({ mensagem: 'Status da ligação inválido.' }, 400);
     }
+    const satisf = d.nivel_satisfacao === '' || d.nivel_satisfacao == null ? null : Number(d.nivel_satisfacao);
+    if (satisf !== null && !(Number.isInteger(satisf) && satisf >= 0 && satisf <= 10)) {
+      return json({ mensagem: 'Nível de satisfação deve ser um inteiro de 0 a 10.' }, 400);
+    }
+    const tri = (v) => (v === true || v === 'true' || v === 1 || v === '1' ? 1 : v === false || v === 'false' || v === 0 || v === '0' ? 0 : null);
 
-    const stmt = env.DB.prepare(`
+    await env.DB.prepare(`
       INSERT INTO inqueritos (
-        microarea, acs_nome, endereco_pec, responsavel_familiar, 
-        telefone_contato, status_ligacao, observacoes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    await stmt.bind(
-      data.microarea || '',
-      data.acs_nome || '',
-      data.endereco_pec || '',
-      data.responsavel_familiar || '',
-      data.telefone_contato || '',
-      data.status_ligacao || 'Não atendeu',
-      data.observacoes || ''
+        profissional_id, microarea, acs_nome, endereco_pec, responsavel_familiar,
+        telefone_contato, visita_registrada_pec, data_visita_pec, visita_relatada_paciente,
+        status_ligacao, conhece_agente, nivel_satisfacao, observacoes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      usuario.id,
+      txt(d.microarea, 10), txt(d.acs_nome, 100), txt(d.endereco_pec, 500),
+      txt(d.responsavel_familiar, 100), txt(d.telefone_contato, 20),
+      tri(d.visita_registrada_pec), txt(d.data_visita_pec, 10), tri(d.visita_relatada_paciente),
+      d.status_ligacao, tri(d.conhece_agente), satisf, txt(d.observacoes, 2000)
     ).run();
 
-    return new Response(JSON.stringify({ message: 'Inquérito gravado com sucesso!' }), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
+    return json({ mensagem: 'Inquérito gravado com sucesso!' }, 201);
   } catch (err) {
-    return new Response(JSON.stringify({ error: 'Erro ao salvar inquérito', details: err.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-export async function onRequestGet(context) {
-  try {
-    const { env } = context;
-    if (!env.DB) {
-      return new Response(JSON.stringify({ error: 'Binding do D1 não configurado.' }), { status: 500 });
-    }
-
-    const { results } = await env.DB.prepare('SELECT * FROM inqueritos ORDER BY data_aplicacao DESC').all();
-    
-    return new Response(JSON.stringify(results), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json' } 
-    });
+    console.error('inqueritos:', err);
+    return json({ mensagem: 'Erro ao salvar inquérito.' }, 500);
   }
 }

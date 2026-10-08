@@ -1,6 +1,4 @@
--- Utilizadores para teste local
--- Nota: A palavra-passe original nestes hashes de exemplo é "123456"
-INSERT OR IGNORE INTO profissionais (cpf, nome, senha_hash, perfil, cnes) 
-VALUES 
-('11122233344', 'Gestor eMulti', '$2a$10$vI8aWBnW3fID.ZQ4/p1G7.2gMIs1RkO5mC4oFp3bL6.1XN2h2', 'admin', '1234567'),
-('55566677788', 'Operador ACS', '$2a$10$vI8aWBnW3fID.ZQ4/p1G7.2gMIs1RkO5mC4oFp3bL6.1XN2h2', 'operador', '1234567');
+-- Usuários de TESTE LOCAL. Senha de ambos: 123456  (troque antes de ir para produção!)
+INSERT OR IGNORE INTO profissionais (cpf, nome, senha_hash, perfil, cnes) VALUES
+('11122233344', 'Gestor eMulti', 'pbkdf2$100000$diTFY/+F/zzqK3yuJ50C9w==$yx3iJ7/bbt+XW2Mm91X9FsCOB7pJkywai8JCAdq+sUE=', 'admin', '1234567'),
+('55566677788', 'Operador ACS', 'pbkdf2$100000$diTFY/+F/zzqK3yuJ50C9w==$yx3iJ7/bbt+XW2Mm91X9FsCOB7pJkywai8JCAdq+sUE=', 'operador', '1234567');
