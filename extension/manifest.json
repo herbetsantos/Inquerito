@@ -1,11 +1,38 @@
 {
   "manifest_version": 3,
   "name": "e-SUS PEC - Extensão de Inquérito",
-  "version": "2.0.0",
-  "description": "Captura os dados do e-SUS PEC (somente ao clicar) e abre o Inquérito ACS.",
-  "permissions": ["activeTab", "scripting"],
+  "version": "2.2.0",
+  "description": "Captura completa do território do e-SUS PEC e gera mailing territorial para o Inquérito ACS.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://inquerito.pages.dev/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Inquérito e-SUS PEC"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://inquerito.pages.dev/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://inquerito.pages.dev/*"
+    ]
   }
 }

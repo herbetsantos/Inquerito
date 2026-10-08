@@ -1,33 +1,29 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      width: 220px;
-      padding: 12px;
-      margin: 0;
-      text-align: center;
-    }
-    button {
-      width: 100%;
-      padding: 10px;
-      background-color: #1351B4;
-      color: white;
-      border: none;
-      border-radius: 100em;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #155BCB;
-    }
-  </style>
+<meta charset="UTF-8">
+<style>
+body{font-family:Arial,sans-serif;width:360px;padding:14px;margin:0;color:#222}
+h3{margin:0 0 8px}.muted{font-size:12px;color:#666}
+.card{border:1px solid #ddd;border-radius:10px;padding:10px;margin:10px 0}
+button{width:100%;padding:9px;margin-top:7px;border:0;border-radius:8px;background:#1351B4;color:#fff;font-weight:700;cursor:pointer}
+button.secondary{background:#eee;color:#222}.micro{display:flex;gap:8px;align-items:center;padding:4px 0}
+#status{font-size:12px;margin-top:8px;line-height:1.35}
+</style>
 </head>
 <body>
-  <h3>Inquérito e-SUS PEC</h3>
-  <button id="btnExtrair">📞 Capturar e Abrir</button>
-  <script src="popup.js"></script>
+<h3>Inquérito e-SUS PEC</h3>
+<div class="muted">Gerador de mailing territorial</div>
+<div class="card">
+  <div><strong>Unidade:</strong> <span id="unidade">—</span></div>
+  <div><strong>Equipe:</strong> <span id="equipe">—</span></div>
+  <div style="margin-top:8px"><strong>Microáreas</strong></div>
+  <div id="microareas">Carregando…</div>
+  <button id="btnTodos" class="secondary">Selecionar todas</button>
+</div>
+<button id="btnGerar">📋 Gerar mailing das microáreas selecionadas</button>
+<button id="btnPaciente" class="secondary">📞 Capturar paciente desta página</button>
+<div id="status"></div>
+<script src="popup.js"></script>
 </body>
 </html>

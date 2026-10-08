@@ -12,6 +12,7 @@
   <header class="app-topbar">
     <div class="app-brand"><strong>Inquérito</strong><span class="app-brand__divider"></span><span>ACS</span></div>
     <div class="app-actions">
+      <a id="lnk-admin" class="btn btn-secondary hidden" href="admin.html">Usuários</a>
       <span id="user-role" class="user-role">Perfil</span>
       <button id="btn-logout" type="button" class="btn btn-secondary">Sair</button>
     </div>
@@ -78,6 +79,7 @@
         const eu = await me.json();
 
         const ehAuditor = eu.perfil === 'auditor';
+        if (eu.perfil === 'admin') document.getElementById('lnk-admin').classList.remove('hidden');
         document.getElementById('user-role').innerText = 'Perfil: ' + (eu.perfil === 'admin' ? 'Administrador' : eu.perfil === 'gestor' ? 'Gestão' : 'Auditoria');
         document.getElementById('page-eyebrow').innerText = ehAuditor ? 'Auditoria' : eu.perfil === 'admin' ? 'Administração' : 'Gestão';
         document.getElementById('page-title').innerText = ehAuditor ? 'Painel de Auditoria' : eu.perfil === 'admin' ? 'Painel de Administração e Gestão' : 'Painel de Gestão';

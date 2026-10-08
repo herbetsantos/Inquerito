@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch { return irParaLogin(); }
 
   if (['admin', 'gestor', 'auditor'].includes(eu.perfil) && $('lnk-dashboard')) $('lnk-dashboard').classList.remove('hidden');
+  if (eu.perfil === 'admin' && $('lnk-admin')) $('lnk-admin').classList.remove('hidden');
 
   $('btn-logout')?.addEventListener('click', async () => {
     await fetch('/api/logout', { method: 'POST' }).catch(() => {});
