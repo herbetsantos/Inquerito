@@ -1,4 +1,3 @@
--- 1. Tabela de Profissionais / Utilizadores com Perfis (RBAC)
 CREATE TABLE IF NOT EXISTS profissionais (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cpf VARCHAR(11) UNIQUE NOT NULL,
@@ -11,21 +10,19 @@ CREATE TABLE IF NOT EXISTS profissionais (
     criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Tabela de Inquéritos / Questionários Aplicados
 CREATE TABLE IF NOT EXISTS inqueritos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    profissional_id INTEGER NOT NULL,
+    profissional_id INTEGER,
     microarea VARCHAR(10),
     acs_nome VARCHAR(100),
     endereco_pec TEXT,
     responsavel_familiar VARCHAR(100),
     telefone_contato VARCHAR(20),
-    status_ligacao VARCHAR(30) NOT NULL, -- 'sucesso', 'recusado', 'nao_atendeu', etc.
+    status_ligacao VARCHAR(30) NOT NULL,
     observacoes TEXT,
     data_aplicacao DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (profissional_id) REFERENCES profissionais(id)
 );
 
--- Indexação para consultas rápidas por CPF e Perfil
 CREATE INDEX IF NOT EXISTS idx_profissionais_cpf ON profissionais(cpf);
 CREATE INDEX IF NOT EXISTS idx_inqueritos_profissional ON inqueritos(profissional_id);
