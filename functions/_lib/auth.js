@@ -77,7 +77,7 @@ export function cookieLimpo(request) {
 export const HORAS_SESSAO = HORAS;
 
 function lerCookie(request, nome) {
-  const m = (request.headers.get('Cookie') || '').match(new RegExp(`(?:^|;\s*)${nome}=([^;]+)`));
+  const m = (request.headers.get('Cookie') || '').match(new RegExp(`(?:^|;\\s*)${nome}=([^;]+)`));
   return m ? m[1] : null;
 }
 
