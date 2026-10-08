@@ -51,3 +51,23 @@ A extensão não altera o PEC nem envia dados para fora do navegador durante a c
 
 ### Limitação importante
 A estrutura do PEC pode mudar e diferentes telas podem usar endpoints/rotas diferentes. Por isso a extensão mantém uma camada híbrida DOM + respostas JSON. A confirmação de 100% da população deve ser feita comparando o total exibido pelo próprio PEC para cada microárea com o total coletado pela extensão.
+
+## Exportação CSV e BI
+
+Os perfis `admin`, `gestor` e `auditor` possuem a permissão `dados.exportar`.
+
+Endpoints de exportação autenticados pela sessão:
+- `GET /api/export/inqueritos.csv?data_inicio=AAAA-MM-DD&data_fim=AAAA-MM-DD`
+- `GET /api/export/campanhas.csv`
+- `GET /api/export/mailing.csv?campanha_id=ID`
+
+A camada de BI é somente leitura e não usa a sessão do usuário. Configure o segredo `BI_API_KEY` no ambiente do Cloudflare Pages/Functions. Os endpoints são:
+- `GET /api/bi/inqueritos`
+- `GET /api/bi/campanhas`
+- `GET /api/bi/mailing?campanha_id=ID`
+
+A chave pode ser enviada no header `X-BI-Key` ou `Authorization: Bearer ...`. O parâmetro `?key=` também é aceito para integrações que não permitem headers, mas o header é preferível. A API de BI não retorna CPF, CNS, telefone, endereço, nome de paciente ou observações de atendimento.
+
+Para o Looker Studio, a recomendação é usar um Community Connector/Apps Script que consulte esses endpoints com `BI_API_KEY`, mantendo a chave fora da URL pública do relatório. O campo `versao` do dataset deve ser usado para versionar alterações futuras do contrato.
+
+Para publicar a chave do BI em produção, use `npx wrangler pages secret put BI_API_KEY` e depois configure um Community Connector do Looker Studio para consultar os endpoints descritos em `docs/looker-studio.md`.

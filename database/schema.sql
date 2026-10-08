@@ -51,6 +51,13 @@ CREATE TABLE IF NOT EXISTS campanhas (
     status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa','encerrada')),
     criado_por INTEGER NOT NULL,
     criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+    total_esperado INTEGER DEFAULT 0,
+    total_coletado INTEGER DEFAULT 0,
+    total_duplicado INTEGER DEFAULT 0,
+    total_sem_cadastro INTEGER DEFAULT 0,
+    coleta_percentual REAL DEFAULT 0,
+    coleta_validada INTEGER DEFAULT 0,
+    coleta_validada_em TEXT,
     FOREIGN KEY (criado_por) REFERENCES profissionais(id)
 );
 

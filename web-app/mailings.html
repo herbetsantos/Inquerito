@@ -31,7 +31,7 @@
 </section>
 <section class="panel">
 <h2>Campanhas existentes</h2>
-<div class="table-wrap"><table id="tabela"><thead><tr><th>Campanha</th><th>Unidade</th><th>Total</th><th>Concluídos</th><th>Pendentes</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+<div class="table-wrap"><table id="tabela"><thead><tr><th>Campanha</th><th>Unidade</th><th>Total</th><th>Concluídos</th><th>Pendentes</th><th>Status</th><th>Exportar</th></tr></thead><tbody></tbody></table></div>
 </section>
 </main>
 <script>
@@ -72,7 +72,7 @@ $('criar').onclick=async()=>{
  const di=await ri.json().catch(()=>({}));if(!ri.ok)return msg(di.mensagem||'Campanha criada, mas houve erro na importação.');
  msg(`${di.mensagem} A campanha está disponível para gestão.`,true);carregar();
 };
-async function carregar(){const r=await fetch('/api/admin/campanhas');if(!r.ok)return;const d=await r.json();$('tabela').querySelector('tbody').innerHTML=(d.campanhas||[]).map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.unidade||'—')}</td><td>${c.total||0}</td><td>${c.concluidos||0}</td><td>${c.pendentes||0}</td><td>${esc(c.status)}</td></tr>`).join('');}
+async function carregar(){const r=await fetch('/api/admin/campanhas');if(!r.ok)return;const d=await r.json();$('tabela').querySelector('tbody').innerHTML=(d.campanhas||[]).map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.unidade||'—')}</td><td>${c.total||0}</td><td>${c.concluidos||0}</td><td>${c.pendentes||0}</td><td>${esc(c.status)}</td><td><a class="btn btn-secondary" href="/api/export/mailing.csv?campanha_id=${encodeURIComponent(c.id)}">CSV</a></td></tr>`).join('');}
 $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST'});location.href='index.html';};
 (async()=>{const r=await fetch('/api/me');const u=await r.json().catch(()=>({}));if(!r.ok||u.perfil!=='admin')location.href='inquerito.html';else carregar();})();
 </script>

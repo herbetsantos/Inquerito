@@ -25,6 +25,19 @@
     </div>
 
     <!-- Cards de Métricas -->
+    <section class="panel" style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div>
+          <h2 class="section-title" style="margin:0">Exportação de dados</h2>
+          <p style="margin:6px 0 0">Baixe os dados disponíveis para o seu perfil em CSV.</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn btn-primary" href="/api/export/inqueritos.csv">Exportar inquéritos CSV</a>
+          <a class="btn btn-secondary" href="/api/export/campanhas.csv">Exportar campanhas CSV</a>
+        </div>
+      </div>
+    </section>
+
     <div class="metrics-grid">
       <div class="card-metric">
         <h3>Total Entrevistas</h3>
