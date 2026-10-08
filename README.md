@@ -1,4 +1,4 @@
-# Inquérito ACS (eMulti)
+# Inquérito ACS
 
 Cloudflare Pages + Pages Functions + D1.
 

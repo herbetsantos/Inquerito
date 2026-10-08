@@ -4,16 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Inquérito Telefônico — ACS</title>
-  <link rel="stylesheet" href="https://cdngovbr-ds.estaleiro.serpro.gov.br/design-system/fonts/rawline/css/rawline.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    <h1>Inquérito Telefônico — ACS</h1>
-    <a id="lnk-dashboard" class="btn btn-secondary hidden" href="dashboard.html">Painel de gestão</a>
-    <button id="btn-logout" class="btn btn-secondary" type="button">Sair</button>
+  <header class="app-topbar">
+    <div class="app-brand"><strong>Inquérito</strong><span class="app-brand__divider"></span><span>ACS</span></div>
+    <div class="app-actions">
+      <a id="lnk-dashboard" class="btn btn-secondary hidden" href="dashboard.html">Painel de gestão</a>
+      <button id="btn-logout" class="btn btn-secondary" type="button">Sair</button>
+    </div>
   </header>
-  <main class="container">
+  <main class="page page--narrow">
+    <div class="page__head">
+      <div class="eyebrow">Inquérito telefônico</div>
+      <h1 class="page__title">Registrar ligação</h1>
+    </div>
     <form id="form-inquerito" class="card">
       <h2 class="card-title">Dados do atendimento</h2>
       <div class="form-grid">

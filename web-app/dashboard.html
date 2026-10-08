@@ -2,18 +2,26 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Painel de Gestão - Inquérito ACS</title>
-  <link rel="stylesheet" href="https://cdngovbr-ds.estaleiro.serpro.gov.br/design-system/fonts/rawline/css/rawline.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-      <h1>Painel de Auditoria e Gestão — Inquérito ACS</h1>
+  <header class="app-topbar">
+    <div class="app-brand"><strong>Inquérito</strong><span class="app-brand__divider"></span><span>ACS</span></div>
+    <div class="app-actions">
       <span class="user-role">Perfil: Gestão</span>
       <button id="btn-logout" type="button" class="btn btn-secondary">Sair</button>
-    </header>
+    </div>
+  </header>
 
-  <div class="container-dashboard">
+  <div class="page">
+    <div class="page__head">
+      <div class="eyebrow">Gestão</div>
+      <h1 class="page__title">Painel de Auditoria e Gestão</h1>
+    </div>
 
     <!-- Cards de Métricas -->
     <div class="metrics-grid">
@@ -33,7 +41,8 @@
 
     <!-- Tabela de Auditoria por ACS -->
     <section>
-      <h2>Acompanhamento por Agente (ACS)</h2>
+      <h2 class="section-title">Acompanhamento por Agente (ACS)</h2>
+      <div class="panel table-wrap">
       <table id="tabela-gestao">
         <thead>
           <tr>
@@ -49,6 +58,7 @@
           <!-- Preenchido via API -->
         </tbody>
       </table>
+      </div>
     </section>
   </div>
 

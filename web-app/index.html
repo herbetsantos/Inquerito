@@ -4,13 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Acesso Restrito — Inquérito ACS</title>
-  <link rel="stylesheet" href="https://cdngovbr-ds.estaleiro.serpro.gov.br/design-system/fonts/rawline/css/rawline.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="login-card">
-    <div class="marca">eMulti · Atenção Primária</div>
-    <h2>Inquérito ACS</h2>
+  <div class="login">
+   <div class="login-layout">
+    <div class="login-hero">
+      <h1>Inquérito ACS</h1>
+      <p>Inquérito telefônico para acompanhar as visitas dos Agentes Comunitários de Saúde.</p>
+    </div>
+    <div class="login-card">
+    <h2>Acesso restrito</h2>
+    <p class="sub">Entre com seu CPF e senha.</p>
     <form id="form-login">
       <div class="form-group"><label for="usuario">CPF</label>
       <input type="text" id="usuario" inputmode="numeric" required autocomplete="username"></div>
@@ -19,6 +26,8 @@
       <button type="submit" class="btn-login">Entrar</button>
       <div id="msg-erro" class="erro-msg hidden" role="alert"></div>
     </form>
+    </div>
+   </div>
   </div>
 
   <script>
