@@ -3,6 +3,8 @@ const status = msg => { $('status').textContent = msg; };
 
 const INQUERITO = 'https://inquerito.pages.dev';
 const FASES_ATIVAS = ['preparo', 'casa'];
+// Coleta só é "ativa" se o laço deu sinal de vida recentemente (a página atualizada mata o laço sem avisar)
+const ativa = (p) => !!p && FASES_ATIVAS.includes(p.phase) && Date.now() - (p.updatedAt || 0) < 90000;
 let podeGerar = true;
 let monitor;
 
@@ -61,13 +63,17 @@ function monitorarColeta(jobId) {
       const r = await chrome.runtime.sendMessage({ type: 'GET_CRAWL_PROGRESS' });
       const p = r?.crawlProgress;
       if (!p || (jobId && p.jobId !== jobId)) return;
-      if (FASES_ATIVAS.includes(p.phase)) {
+      if (ativa(p)) {
         status(`${p.current || 'Processando…'}\n${p.processed || 0}/${p.total || 0} casas · ${resumo(p)}`);
         return;
       }
       clearInterval(monitor);
       $('btnParar').style.display = 'none';
       $('btnGerar').disabled = !podeGerar; $('btnRetomar').disabled = !podeGerar;
+      if (FASES_ATIVAS.includes(p.phase)) {
+        status(`Coleta interrompida (a página foi atualizada ou travou). O que já foi lido está guardado.\nVolte à lista do Acompanhamento do território e clique em "Continuar coleta interrompida".\n${resumo(p)}`);
+        return;
+      }
       status(`${p.current || p.phase}\n${resumo(p)}${p.phase === 'concluido' || p.phase === 'cancelado' ? '\nAgora importe o mailing na página Mailing do Inquérito.' : ''}`);
     } catch (_) {}
   }, 1200);
@@ -119,5 +125,5 @@ $('status').style.whiteSpace='pre-line';
   await verificarPerfil();
   // Se a coleta já estiver rodando (popup reaberto), volta a acompanhar
   const r=await chrome.runtime.sendMessage({type:'GET_CRAWL_PROGRESS'}).catch(()=>null);
-  if(r?.crawlProgress && FASES_ATIVAS.includes(r.crawlProgress.phase)){ $('btnGerar').disabled=true; $('btnRetomar').disabled=true; monitorarColeta(r.crawlProgress.jobId); }
+  if(ativa(r?.crawlProgress)){ $('btnGerar').disabled=true; $('btnRetomar').disabled=true; monitorarColeta(r.crawlProgress.jobId); }
 })();

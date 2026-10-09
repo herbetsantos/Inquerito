@@ -14,7 +14,7 @@ async function crawlNaPagina(cfg) {
   const store = (o) => chrome.storage.local.set(o);
 
   const prog = { type: 'CRAWL_PROGRESS', jobId: cfg.jobId, phase: 'preparo', current: '', total: 0, processed: 0, coletados: 0, semTelefone: 0, errors: 0, ultimoErro: '' };
-  const salvarProg = (extra = {}) => { Object.assign(prog, extra); return store({ crawlProgress: prog }); };
+  const salvarProg = (extra = {}) => { Object.assign(prog, extra, { updatedAt: Date.now() }); return store({ crawlProgress: prog }); };
 
   const esperar = async (cond, ms = 10000, passo = 150) => {
     const t0 = Date.now();
@@ -170,7 +170,7 @@ async function crawlNaPagina(cfg) {
             telefone: tels[0], telefones: tels, ultima_visita: iso(d.ultima_visita), sig: alvo.sig
           });
         }
-        if (n % 10 === 0) await persistir();
+        await persistir(); // salva a cada casa: se a página travar, o "Continuar" retoma daqui
       } catch (e) {
         prog.errors++; prog.ultimoErro = e.message;
       }
@@ -191,7 +191,7 @@ async function iniciarColeta(msg) {
   const jobId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const cfg = { jobId, microareas, unidade: msg.unidade || '', equipe: msg.equipe || '', retomar: Boolean(msg.retomar) };
   await chrome.storage.local.remove('crawlCancel');
-  await chrome.storage.local.set({ crawlProgress: { type: 'CRAWL_PROGRESS', jobId, phase: 'preparo', current: 'Iniciando…', total: 0, processed: 0, coletados: 0, semTelefone: 0, errors: 0 } });
+  await chrome.storage.local.set({ crawlProgress: { type: 'CRAWL_PROGRESS', jobId, phase: 'preparo', current: 'Iniciando…', total: 0, processed: 0, coletados: 0, semTelefone: 0, errors: 0, updatedAt: Date.now() } });
   // Não aguarda o fim: o laço roda na aba e informa o progresso pelo storage
   chrome.scripting.executeScript({ target: { tabId: msg.tabId }, func: crawlNaPagina, args: [cfg] })
     .catch((e) => chrome.storage.local.set({ crawlProgress: { type: 'CRAWL_PROGRESS', jobId, phase: 'erro', current: 'Não foi possível iniciar: ' + e.message, total: 0, processed: 0, coletados: 0, semTelefone: 0, errors: 1 } }));
@@ -204,8 +204,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg?.type === 'STOP_CRAWL') {
-    chrome.storage.local.get('crawlProgress').then(({ crawlProgress }) =>
-      chrome.storage.local.set({ crawlCancel: crawlProgress?.jobId || 'x' })).then(() => sendResponse({ ok: true }));
+    chrome.storage.local.get('crawlProgress').then(({ crawlProgress }) => {
+      const p = crawlProgress;
+      const viva = p && ['preparo', 'casa'].includes(p.phase) && Date.now() - (p.updatedAt || 0) < 90000;
+      // Se o laço morreu (página atualizada/travada), ninguém vai ler o cancelamento: encerra o estado aqui
+      if (p && ['preparo', 'casa'].includes(p.phase) && !viva) {
+        return chrome.storage.local.set({ crawlProgress: { ...p, phase: 'cancelado', current: 'Coleta interrompida. O que já foi lido foi guardado.', updatedAt: Date.now() } });
+      }
+      return chrome.storage.local.set({ crawlCancel: p?.jobId || 'x' });
+    }).then(() => sendResponse({ ok: true }));
     return true;
   }
   if (msg?.type === 'GET_CRAWL_PROGRESS') {
