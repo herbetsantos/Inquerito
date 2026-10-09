@@ -1,175 +1,228 @@
-const CRAWL = new Map();
+// Coleta do mailing por NAVEGAÇÃO: a extensão clica na lupa de cada casa, lê a página que abre
+// (telefone, última visita, equipe, ACS) e volta para a lista. O laço roda dentro da aba do e-SUS,
+// então não depende do service worker ficar acordado; o progresso fica em chrome.storage.
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// Executa NA PÁGINA do e-SUS (mundo isolado, com acesso a chrome.storage). Precisa ser autocontida.
+async function crawlNaPagina(cfg) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const normMicro = (v) => norm(v).replace(/^microárea\s*/i, '').replace(/\s*\(\d+\)\s*$/, '').toLowerCase();
+  const LISTA = /acompanhamento-territorio\/?$/;
+  const CASA = /visualizarImovel\/(\d+)/;
+  const ROW = '[data-testid="MicroareaLogradouroListItemBody"]';
+  const BTN_GRUPO = '[data-accordion-component="AccordionItemButton"]';
+  const store = (o) => chrome.storage.local.set(o);
 
-function waitTabComplete(tabId, timeout = 30000) {
-  return new Promise((resolve, reject) => {
-    let done = false;
-    const timer = setTimeout(() => finish(new Error('Tempo esgotado aguardando o e-SUS responder.')), timeout);
-    const finish = (err) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      chrome.tabs.onUpdated.removeListener(listener);
-      err ? reject(err) : resolve();
-    };
-    const listener = (id, changeInfo) => {
-      if (id === tabId && changeInfo.status === 'complete') finish();
-    };
-    chrome.tabs.onUpdated.addListener(listener);
-    chrome.tabs.get(tabId).then(tab => {
-      if (tab.status === 'complete') finish();
-    }).catch(finish);
-  });
-}
+  const prog = { type: 'CRAWL_PROGRESS', jobId: cfg.jobId, phase: 'preparo', current: '', total: 0, processed: 0, coletados: 0, semTelefone: 0, errors: 0, ultimoErro: '' };
+  const salvarProg = (extra = {}) => { Object.assign(prog, extra); return store({ crawlProgress: prog }); };
 
-async function injectExtract(tabId, args) {
-  const [{result}] = await chrome.scripting.executeScript({
-    target: {tabId},
-    world: 'MAIN',
-    func: (args) => {
-      const text = el => (el?.innerText || el?.textContent || '').replace(/\s+/g, ' ').trim();
-      const body = document.body?.innerText || '';
-      const phones = [...new Set((body.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\d{4}|\d{4})[-.\s]?\d{4}/g) || []).map(x => x.trim()))];
-      const date = (body.match(/(?:última\s+visita|ultima\s+visita|último\s+atendimento|ultimo\s+atendimento)[^\d]{0,40}(\d{2}[\/.]\d{2}[\/.]\d{4})/i) || [])[1] || '';
-      const links = [...document.querySelectorAll('a[href]')].map(a => ({text:text(a), href:new URL(a.getAttribute('href') || '', location.href).href}));
-      const json = window.__INQUERITO_PEC_RESPONSES__ || [];
-      const allJson = [];
-      const walk = (v, depth=0) => {
-        if (depth > 8 || v == null) return;
-        if (Array.isArray(v)) return v.forEach(x => walk(x, depth+1));
-        if (typeof v !== 'object') return;
-        const keys = Object.keys(v);
-        const nameKey = keys.find(k => /^(nome|nomePaciente|nome_paciente|nomeCompleto|no_cidadao)$/i.test(k) || /nome.*(paciente|cidada|morador)/i.test(k));
-        const idKey = keys.find(k => /^(id|idCidadao|id_cidadao|codigo|codigoCidadao|cns|cpf)$/i.test(k) || /(id.*cidada|codigo.*cidada|cns|cpf)/i.test(k));
-        if (nameKey || idKey) {
-          const obj = {};
-          for (const k of keys) {
-            const val = v[k];
-            if (val == null || typeof val === 'object') continue;
-            if (/nome|cns|cpf|nascimento|telefone|celular|visita|endereco|logradouro|numero|bairro|cep|familia|microarea|equipe|acs/i.test(k)) obj[k] = String(val).trim();
-          }
-          if (Object.keys(obj).length >= 2) allJson.push(obj);
-        }
-        for (const k of keys) if (v[k] && typeof v[k] === 'object') walk(v[k], depth+1);
-      };
-      for (const r of json) walk(r.json);
-      return {url:location.href, body, phones, date, links, json:allJson.slice(0,3000)};
-    },
-    args: [args]
-  });
-  return result;
-}
-
-async function runCrawler(msg, sender) {
-  const sourceTabId = msg.tabId;
-  const jobId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const job = {jobId, sourceTabId, total:0, processed:0, errors:0, items:[], running:true};
-  CRAWL.set(jobId, job);
-
-  const update = async (extra={}) => {
-    const payload = {type:'CRAWL_PROGRESS', jobId, ...job, ...extra};
-    await chrome.storage.local.set({crawlProgress: payload});
+  const esperar = async (cond, ms = 10000, passo = 150) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      try { const v = cond(); if (v) return v; } catch { /* tenta de novo */ }
+      await sleep(passo);
+    }
+    return null;
   };
 
-  try {
-    const [{result:base}] = await chrome.scripting.executeScript({
-      target:{tabId:sourceTabId}, world:'MAIN',
-      func: async (microareas) => {
-        const text = el => (el?.innerText || el?.textContent || '').replace(/\s+/g,' ').trim();
-        const wait = ms => new Promise(r=>setTimeout(r,ms));
-        const norm = v => String(v||'').replace(/^microárea\s*/i,'').replace(/\s*\(\d+\)\s*$/,'').trim();
-        const select = label => {
-          const target = norm(label);
-          const els=[...document.querySelectorAll('[role="tab"],button,a[role="tab"]')];
-          const el=els.find(x=>norm(text(x))===target);
-          if(el){el.click();return true} return false;
-        };
-        const houses=[];
-        for(const micro of microareas){
-          if(!select(micro)) continue;
-          await wait(1000);
-          const headers=[...document.querySelectorAll('[data-accordion-component="AccordionItemButton"]')];
-          for(const h of headers){
-            if(h.getAttribute('aria-expanded')==='true') continue;
-            const t=text(h);
-            if(!/imóveis?/i.test(t)) continue;
-            h.scrollIntoView({block:'center'}); h.click();
-            await wait(350);
-            const item=h.closest('[data-accordion-component="AccordionItem"]') || h.parentElement;
-            for(const a of [...(item?.querySelectorAll('a[href]')||[])]){
-              const href=a.getAttribute('href')||'';
-              const m=href.match(/visualizarImovel\/(\d+)/i);
-              if(!m) continue;
-              houses.push({id:m[1],href:new URL(`/gestaoCadastros/acompanhamento-territorio/visualizarImovel/${m[1]}`,location.origin).href,microarea:micro});
-            }
-          }
-          await wait(250);
-        }
-        return {houses:[...new Map(houses.map(h=>[h.id,h])).values()],url:location.href};
-      },
-      args:[msg.microareas||[]]
-    });
-
-    const houses=base?.houses||[];
-    job.total=houses.length;
-    await update({phase:'fila', current:'Fila montada'});
-
-    if(!houses.length) throw new Error('Nenhuma casa foi encontrada. Verifique se as microáreas estão carregadas e se os grupos de imóveis aparecem.');
-
-    const workTab=await chrome.tabs.create({url:houses[0].href, active:false});
-    const tabId=workTab.id;
-
-    for(let i=0;i<houses.length;i++){
-      const h=houses[i];
-      job.processed=i;
-      await update({phase:'casa', current:`Casa ${i+1} de ${houses.length}`, house:h});
-      try{
-        for(const [section,label] of [['informacoes','Informações cadastrais'],['familias','Famílias e moradores'],['visitas','Últimas visitas']]){
-          const url=`${h.href}/${section}`;
-          await chrome.tabs.update(tabId,{url,active:false});
-          await waitTabComplete(tabId,35000);
-          await sleep(700);
-          const data=await injectExtract(tabId,{house:h,section});
-          job.items.push({house:h,section,label,data});
-          await update({phase:'respondendo', current:`${label}: casa ${i+1}/${houses.length}`, house:h});
-        }
-      }catch(e){
-        job.errors++;
-        job.items.push({house:h,error:e.message});
-      }
-      await sleep(250);
+  // Lê "rótulo → valor" (o valor é o elemento irmão seguinte do rótulo)
+  const valor = (rotulo, raiz = document) => {
+    const alvo = rotulo.toLowerCase();
+    for (const e of raiz.querySelectorAll('span,div,p,dt,th,label')) {
+      if (e.children.length) continue;
+      if (norm(e.textContent).replace(/:$/, '').toLowerCase() !== alvo) continue;
+      const v = norm(e.nextElementSibling?.textContent);
+      if (v) return v;
     }
-    await chrome.tabs.remove(tabId).catch(()=>{});
-    job.running=false;
-    await chrome.storage.local.set({crawlResult:{savedAt:new Date().toISOString(),jobId,itens:job.items},crawlProgress:{type:'CRAWL_PROGRESS',jobId,...job,phase:'concluido',current:'Coleta concluída'}});
-    return {ok:true,jobId,total:job.total,errors:job.errors};
-  }catch(e){
-    job.running=false;
-    await update({phase:'erro',current:e.message});
-    return {ok:false,jobId,mensagem:e.message};
+    return '';
+  };
+  const semCodigo = (s) => norm(s).replace(/\s*-\s*\d{5,}\s*$/, '');
+  const tel = (s) => { const d = String(s || '').replace(/\D/g, ''); return d.length >= 10 && d.length <= 13 ? norm(s) : ''; };
+  const iso = (s) => { const m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
+
+  const abaDe = (micro) => [...document.querySelectorAll('[role="tab"]')].find((e) => normMicro(e.textContent) === normMicro(micro));
+  const grupos = () => [...document.querySelectorAll('[data-accordion-component="AccordionItem"]')]
+    .map((el) => ({ el, titulo: norm(el.querySelector(BTN_GRUPO)?.textContent) }));
+
+  async function garantirMicro(micro) {
+    const aba = await esperar(() => abaDe(micro), 8000);
+    if (!aba) return false;
+    if (aba.getAttribute('tabindex') !== '0') { aba.click(); await sleep(900); }
+    await esperar(() => document.querySelector(ROW) || document.querySelector(BTN_GRUPO), 8000);
+    return true;
   }
+  async function abrirGrupos() {
+    // Reconsulta a tela a cada clique: se a tela se redesenhar, os botões antigos deixam de valer
+    for (let i = 0; i < 80; i++) {
+      const h = [...document.querySelectorAll(BTN_GRUPO)].find((x) => x.getAttribute('aria-expanded') !== 'true');
+      if (!h) break;
+      h.click();
+      await sleep(350);
+    }
+    await sleep(300);
+  }
+  async function voltarParaLista() {
+    for (let i = 0; i < 3 && !LISTA.test(location.pathname); i++) {
+      history.back();
+      await esperar(() => LISTA.test(location.pathname), 6000);
+    }
+    return LISTA.test(location.pathname);
+  }
+  async function prepararLista(micro) {
+    if (!LISTA.test(location.pathname)) await voltarParaLista();
+    const aba = abaDe(micro);
+    if (!aba || aba.getAttribute('tabindex') !== '0') await garantirMicro(micro);
+    if (!document.querySelector(ROW) || document.querySelector(`${BTN_GRUPO}[aria-expanded="false"]`)) {
+      await abrirGrupos();
+      await esperar(() => document.querySelector(ROW), 8000);
+    }
+  }
+  const linhaDe = (titulo, idx, ver) => {
+    const g = grupos().find((x) => x.titulo === titulo);
+    if (!g) return null;
+    const rows = [...g.el.querySelectorAll(ROW)];
+    if (rows[idx] && norm(rows[idx].innerText).startsWith(ver)) return rows[idx];
+    return rows.find((r) => norm(r.innerText).startsWith(ver)) || null;
+  };
+
+  // Página da casa (aba "Informações cadastrais")
+  function lerCasa() {
+    const h1 = norm(document.querySelector('h1')?.textContent);
+    const cab = document.querySelector('main header') || document;
+    const cep = [...cab.querySelectorAll('span,div,p')].find((e) => !e.children.length && /\d{5}-\d{3}/.test(e.textContent));
+    let acs = '';
+    const cbo = [...document.querySelectorAll('span,p,div')].find((e) => !e.children.length && norm(e.textContent).toUpperCase() === 'CBO');
+    if (cbo) {
+      let c = cbo;
+      for (let i = 0; i < 8 && c; i++) { c = c.parentElement; if (c && /Unidade de saúde/i.test(c.textContent)) break; }
+      if (c) acs = norm([...c.querySelectorAll('span')].find((s) => !s.children.length && !/^(CBO|Equipe|Unidade de saúde)$/i.test(norm(s.textContent)))?.textContent);
+    }
+    return {
+      microarea: valor('Microárea'),
+      telefone_contato: valor('Telefone de contato'),
+      telefone_residencial: valor('Telefone residencial'),
+      ultima_visita: valor('Última visita'),
+      equipe: semCodigo(valor('Equipe')),
+      unidade: semCodigo(valor('Unidade de saúde')),
+      acs,
+      endereco: [h1, norm(cep?.textContent)].filter(Boolean).join(' — ')
+    };
+  }
+
+  let itens = [];
+  let semTelSigs = [];
+  const persistir = () => store({ mailing: { savedAt: new Date().toISOString(), itens: [...new Map(itens.map((x) => [x.chave_externa, x])).values()], contexto: { unidade: cfg.unidade || '', equipe: cfg.equipe || '', semTelSigs } } });
+  const terminar = async (fase, msg) => { await persistir(); await salvarProg({ phase: fase, current: msg, coletados: new Set(itens.map((x) => x.chave_externa)).size }); };
+
+  try {
+    if (cfg.retomar) {
+      const ant = (await chrome.storage.local.get('mailing')).mailing;
+      itens = ant?.itens || [];
+      semTelSigs = ant?.contexto?.semTelSigs || [];
+      prog.semTelefone = semTelSigs.length;
+    }
+    const feitas = new Set([...itens.map((x) => x.sig), ...semTelSigs]);
+
+    // 1) Planejamento: quantas casas há em cada microárea
+    await salvarProg({ phase: 'preparo', current: 'Contando as casas…' });
+    const plano = [];
+    for (const micro of cfg.microareas) {
+      await salvarProg({ current: `Contando as casas da microárea ${micro}…` });
+      if (!(await garantirMicro(micro))) { prog.errors++; prog.ultimoErro = `Aba da microárea ${micro} não encontrada.`; continue; }
+      await abrirGrupos();
+      for (const g of grupos()) {
+        [...g.el.querySelectorAll(ROW)].forEach((row, idx) => {
+          const ver = norm(row.innerText).slice(0, 100);
+          plano.push({ micro, titulo: g.titulo, idx, ver, resp: valor('Responsável familiar', row), sig: `${micro}|${g.titulo}|${idx}|${ver}` });
+        });
+      }
+    }
+    prog.total = plano.length;
+    if (!plano.length) { await terminar('erro', 'Nenhuma casa encontrada nas microáreas escolhidas.'); return; }
+
+    // 2) Visita cada casa
+    let n = 0;
+    for (const alvo of plano) {
+      n++;
+      if (feitas.has(alvo.sig)) { prog.processed = n; continue; }
+      if ((await chrome.storage.local.get('crawlCancel')).crawlCancel === cfg.jobId) { await terminar('cancelado', 'Coleta interrompida. O que já foi lido foi guardado.'); return; }
+      await salvarProg({ phase: 'casa', processed: n - 1, current: `Microárea ${alvo.micro}: casa ${n} de ${plano.length}` });
+      try {
+        await prepararLista(alvo.micro);
+        const row = linhaDe(alvo.titulo, alvo.idx, alvo.ver);
+        if (!row) throw new Error('Linha da casa não encontrada na lista.');
+        row.querySelector('button')?.click();
+        const abriu = await esperar(() => CASA.test(location.pathname) && valor('Microárea'), 12000);
+        if (!abriu) throw new Error('A casa não abriu na mesma aba.');
+        await sleep(250);
+        const id = location.pathname.match(CASA)[1];
+        const d = lerCasa();
+        const url = `${location.origin}/gestaoCadastros/acompanhamento-territorio/visualizarImovel/${id}`;
+        const tels = [...new Set([tel(d.telefone_contato), tel(d.telefone_residencial)].filter(Boolean))];
+        if (!tels.length) {
+          prog.semTelefone++; semTelSigs.push(alvo.sig);
+        } else {
+          itens.push({
+            chave_externa: url, pec_url: url,
+            nome_paciente: alvo.resp && !/n[ãa]o informado/i.test(alvo.resp) ? alvo.resp : '',
+            unidade: d.unidade || cfg.unidade || '', equipe: d.equipe || cfg.equipe || '',
+            microarea: d.microarea || alvo.micro, acs_nome: d.acs, endereco: d.endereco,
+            telefone: tels[0], telefones: tels, ultima_visita: iso(d.ultima_visita), sig: alvo.sig
+          });
+        }
+        if (n % 10 === 0) await persistir();
+      } catch (e) {
+        prog.errors++; prog.ultimoErro = e.message;
+      }
+      await voltarParaLista();
+      await esperar(() => document.querySelector(ROW), 8000);
+    }
+    prog.processed = plano.length;
+    await terminar('concluido', `Coleta concluída: ${new Set(itens.map((x) => x.chave_externa)).size} contatos com telefone.`);
+  } catch (e) {
+    await terminar('erro', 'Falha na coleta: ' + e.message);
+  }
+}
+
+async function iniciarColeta(msg) {
+  if (!msg.tabId) return { ok: false, mensagem: 'Aba do e-SUS não informada.' };
+  const microareas = (msg.microareas || []).filter(Boolean);
+  if (!microareas.length) return { ok: false, mensagem: 'Selecione ao menos uma microárea.' };
+  const jobId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const cfg = { jobId, microareas, unidade: msg.unidade || '', equipe: msg.equipe || '', retomar: Boolean(msg.retomar) };
+  await chrome.storage.local.remove('crawlCancel');
+  await chrome.storage.local.set({ crawlProgress: { type: 'CRAWL_PROGRESS', jobId, phase: 'preparo', current: 'Iniciando…', total: 0, processed: 0, coletados: 0, semTelefone: 0, errors: 0 } });
+  // Não aguarda o fim: o laço roda na aba e informa o progresso pelo storage
+  chrome.scripting.executeScript({ target: { tabId: msg.tabId }, func: crawlNaPagina, args: [cfg] })
+    .catch((e) => chrome.storage.local.set({ crawlProgress: { type: 'CRAWL_PROGRESS', jobId, phase: 'erro', current: 'Não foi possível iniciar: ' + e.message, total: 0, processed: 0, coletados: 0, semTelefone: 0, errors: 1 } }));
+  return { ok: true, jobId };
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'START_SEQUENTIAL_CRAWL') {
-    runCrawler(msg,sender).then(sendResponse).catch(e=>sendResponse({ok:false,mensagem:e.message}));
+    iniciarColeta(msg).then(sendResponse).catch((e) => sendResponse({ ok: false, mensagem: e.message }));
+    return true;
+  }
+  if (msg?.type === 'STOP_CRAWL') {
+    chrome.storage.local.get('crawlProgress').then(({ crawlProgress }) =>
+      chrome.storage.local.set({ crawlCancel: crawlProgress?.jobId || 'x' })).then(() => sendResponse({ ok: true }));
     return true;
   }
   if (msg?.type === 'GET_CRAWL_PROGRESS') {
-    chrome.storage.local.get(['crawlProgress','crawlResult']).then(data=>sendResponse({ok:true,...data}));
+    chrome.storage.local.get(['crawlProgress', 'mailing']).then((data) => sendResponse({ ok: true, ...data }));
     return true;
   }
   if (msg?.type === 'SAVE_MAILING') {
-    chrome.storage.local.set({mailing:{savedAt:new Date().toISOString(),itens:Array.isArray(msg.itens)?msg.itens:[],contexto:msg.contexto||{}}}).then(()=>sendResponse({ok:true,total:msg.itens?.length||0})).catch(err=>sendResponse({ok:false,mensagem:err.message}));
+    chrome.storage.local.set({ mailing: { savedAt: new Date().toISOString(), itens: Array.isArray(msg.itens) ? msg.itens : [], contexto: msg.contexto || {} } })
+      .then(() => sendResponse({ ok: true, total: msg.itens?.length || 0 })).catch((err) => sendResponse({ ok: false, mensagem: err.message }));
     return true;
   }
   if (msg?.type === 'GET_MAILING') {
-    chrome.storage.local.get('mailing').then(data=>sendResponse({ok:true,mailing:data.mailing||null})).catch(err=>sendResponse({ok:false,mensagem:err.message}));
+    chrome.storage.local.get('mailing').then((data) => sendResponse({ ok: true, mailing: data.mailing || null })).catch((err) => sendResponse({ ok: false, mensagem: err.message }));
     return true;
   }
   if (msg?.type === 'CLEAR_MAILING') {
-    chrome.storage.local.remove(['mailing','crawlResult','crawlProgress']).then(()=>sendResponse({ok:true})).catch(err=>sendResponse({ok:false,mensagem:err.message}));
+    chrome.storage.local.remove(['mailing', 'crawlResult', 'crawlProgress', 'crawlCancel']).then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ ok: false, mensagem: err.message }));
     return true;
   }
 });

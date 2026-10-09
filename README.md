@@ -73,3 +73,15 @@ A chave pode ser enviada no header `X-BI-Key` ou `Authorization: Bearer ...`. O 
 Para o Looker Studio, a recomendação é usar um Community Connector/Apps Script que consulte esses endpoints com `BI_API_KEY`, mantendo a chave fora da URL pública do relatório. O campo `versao` do dataset deve ser usado para versionar alterações futuras do contrato.
 
 Para publicar a chave do BI em produção, use `npx wrangler pages secret put BI_API_KEY` e depois configure um Community Connector do Looker Studio para consultar os endpoints descritos em `docs/looker-studio.md`.
+
+## Fluxo do mailing (v2.8)
+
+1. **Administrador** — no e-SUS (Acompanhamento do território), abre a extensão, escolhe as microáreas e clica em
+   *Gerar mailing*. A extensão abre uma casa por vez (clica na lupa, lê telefone, última visita, equipe e ACS, volta
+   para a lista). Pode parar e depois usar *Continuar coleta interrompida*.
+2. **Administrador** — em *Mailing* no Inquérito: importa o mailing da extensão, marca equipes/microáreas e cria a campanha.
+3. **Operador** — não precisa da extensão. Ao abrir *Registrar ligação*, o sistema entrega o próximo contato pendente
+   da campanha ativa; ao salvar, grava a resposta e já carrega o seguinte. *Pular contato* devolve o atual ao fim da fila.
+   Contatos parados há mais de 30 minutos voltam para a fila.
+
+Bancos criados antes da v2.8: rode `database/migracao-v2.8.sql` (um comando por vez).

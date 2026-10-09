@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mailing territorial — Inquérito ACS</title>
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 <header class="app-topbar"><div class="app-brand"><strong>Inquérito</strong><span class="app-brand__divider"></span><span>ACS</span></div>
@@ -66,7 +66,7 @@ window.addEventListener('message',e=>{
 $('importar').onclick=()=>{window.postMessage({source:'inquerito-admin',action:'getMailingFromExtension'},'*');msg('Solicitando os dados à extensão…','info');};
 $('criar').onclick=async()=>{
  if(!importado?.itens?.length)return msg('Importe primeiro o mailing da extensão.');
- const selecoes=[...document.querySelectorAll('.pair:checked')].map(x=>({equipe:x.dataset.equipe,microarea:x.value}));
+ const selecoes=[...document.querySelectorAll('.pair:checked')].map(x=>({equipe:x.dataset.equipe==='Equipe não identificada'?'':x.dataset.equipe,microarea:x.value==='Microárea não identificada'?'':x.value}));
  if(!selecoes.length)return msg('Selecione ao menos uma equipe e uma microárea.');
  const nome=$('nome').value.trim();if(!nome)return msg('Informe o nome da campanha.');
  const r=await fetch('/api/admin/campanhas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome,unidade:$('unidade').value,composicao:{selecoes}})});

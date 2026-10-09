@@ -15,6 +15,7 @@ button.secondary{background:#eee;color:#222}.micro{display:flex;gap:8px;align-it
 <h3>Inquérito e-SUS PEC</h3>
 <div class="muted">Gerador de mailing territorial</div>
 <div class="card">
+  <div><strong>Perfil no Inquérito:</strong> <span id="perfil">verificando…</span></div>
   <div><strong>Unidade:</strong> <span id="unidade">—</span></div>
   <div><strong>Equipe:</strong> <span id="equipe">—</span></div>
   <div style="margin-top:8px"><strong>Microáreas</strong></div>
@@ -22,7 +23,9 @@ button.secondary{background:#eee;color:#222}.micro{display:flex;gap:8px;align-it
   <button id="btnTodos" class="secondary">Selecionar todas</button>
 </div>
 <button id="btnGerar">📋 Gerar mailing das microáreas selecionadas</button>
-<button id="btnPaciente" class="secondary">📞 Capturar paciente desta página</button>
+<button id="btnRetomar" class="secondary">↻ Continuar coleta interrompida</button>
+<button id="btnParar" class="secondary" style="display:none">⏹ Parar coleta</button>
+<div class="muted" style="margin-top:8px">Durante a coleta, a extensão abre uma casa por vez nesta aba. Não mexa na aba do e-SUS até concluir. Depois, importe o mailing em <b>Mailing</b>, no Inquérito.</div>
 <div id="status"></div>
 <script src="popup.js"></script>
 </body>

@@ -1,7 +1,34 @@
 const $ = id => document.getElementById(id);
 const status = msg => { $('status').textContent = msg; };
 
-async function executar() {
+const INQUERITO = 'https://inquerito.pages.dev';
+const FASES_ATIVAS = ['preparo', 'casa'];
+let podeGerar = true;
+let monitor;
+
+// O servidor sempre confere o perfil na importação; aqui só evitamos trabalho à toa.
+async function verificarPerfil() {
+  try {
+    const r = await fetch(INQUERITO + '/api/me', { credentials: 'include' });
+    if (r.ok) {
+      const me = await r.json();
+      $('perfil').textContent = `${me.nome} (${me.perfil})`;
+      if (me.perfil !== 'admin') {
+        podeGerar = false;
+        $('btnGerar').disabled = true; $('btnRetomar').disabled = true;
+        status('Somente o perfil administrador gera o mailing. Entre como administrador no Inquérito.');
+      }
+      return;
+    }
+    $('perfil').textContent = 'não confirmado';
+    status('Entre como administrador em ' + INQUERITO.replace('https://', '') + '. A importação do mailing exige esse perfil.');
+  } catch {
+    $('perfil').textContent = 'não confirmado';
+  }
+}
+
+async function executar(retomar = false) {
+  if (!podeGerar) return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) { status('Nenhuma aba ativa.'); return; }
   const selecionadas = [...document.querySelectorAll('input[name="microarea"]:checked')].map(x => x.value);
@@ -9,66 +36,41 @@ async function executar() {
   if (!/^https:\/\/esus\.cajamar\.sp\.gov\.br\/gestaoCadastros\/acompanhamento-territorio/.test(tab.url || '')) {
     status('Abra o e-SUS na tela Acompanhamento do território.'); return;
   }
-  $('btnGerar').disabled = true;
-  status('Montando a fila de casas. Depois, a extensão abrirá uma casa por vez e aguardará cada resposta…');
+  const ctx = id => { const t = $(id).textContent; return /^(—|Não identificada)$/.test(t) ? '' : t; };
+  $('btnGerar').disabled = true; $('btnRetomar').disabled = true;
+  status('Iniciando a coleta…');
   try {
-    const r = await chrome.runtime.sendMessage({type:'START_SEQUENTIAL_CRAWL', tabId:tab.id, microareas:selecionadas});
-    if (!r?.ok) { status('Falha ao iniciar: ' + (r?.mensagem || 'erro desconhecido')); return; }
-    status(`Coleta iniciada: ${r.total || 0} casas na fila. Deixe a aba trabalhar até concluir.`);
+    const r = await chrome.runtime.sendMessage({ type: 'START_SEQUENTIAL_CRAWL', tabId: tab.id, microareas: selecionadas, unidade: ctx('unidade'), equipe: ctx('equipe'), retomar });
+    if (!r?.ok) { status('Falha ao iniciar: ' + (r?.mensagem || 'erro desconhecido')); $('btnGerar').disabled = false; $('btnRetomar').disabled = false; return; }
     monitorarColeta(r.jobId);
-  } catch(e) { status('Não foi possível iniciar a coleta: '+e.message); }
-  finally { $('btnGerar').disabled=false; }
+  } catch (e) { status('Não foi possível iniciar a coleta: ' + e.message); $('btnGerar').disabled = false; $('btnRetomar').disabled = false; }
 }
 
-let monitor;
+function resumo(p) {
+  const partes = [`${p.coletados || 0} contatos com telefone`];
+  if (p.semTelefone) partes.push(`${p.semTelefone} sem telefone (ignorados)`);
+  if (p.errors) partes.push(`${p.errors} erro(s)${p.ultimoErro ? ': ' + p.ultimoErro : ''}`);
+  return partes.join(' · ');
+}
+
 function monitorarColeta(jobId) {
   clearInterval(monitor);
-  monitor=setInterval(async()=>{
+  $('btnParar').style.display = '';
+  monitor = setInterval(async () => {
     try {
-      const r=await chrome.runtime.sendMessage({type:'GET_CRAWL_PROGRESS'});
-      const p=r?.crawlProgress;
-      if(!p || p.jobId!==jobId) return;
-      if(p.phase==='concluido'){
-        clearInterval(monitor);
-        const c=(p.items||[]).filter(x=>x.house && x.data).length;
-        status(`Coleta concluída: ${p.total||0} casas processadas, ${c} páginas internas coletadas, ${p.errors||0} erro(s).`);
-      } else if(p.phase==='erro'){
-        clearInterval(monitor); status('Coleta interrompida: '+(p.current||'erro desconhecido'));
-      } else {
-        status(`${p.current||'Processando…'} — ${p.processed||0}/${p.total||0} casas.`);
+      const r = await chrome.runtime.sendMessage({ type: 'GET_CRAWL_PROGRESS' });
+      const p = r?.crawlProgress;
+      if (!p || (jobId && p.jobId !== jobId)) return;
+      if (FASES_ATIVAS.includes(p.phase)) {
+        status(`${p.current || 'Processando…'}\n${p.processed || 0}/${p.total || 0} casas · ${resumo(p)}`);
+        return;
       }
-    } catch(_) {}
-  },1200);
-}
-
-async function capturarPaciente() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return;
-  try {
-    const [{ result }] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      world: 'MAIN',
-      func: () => {
-        const t = s => document.querySelector(s)?.innerText?.trim() || document.querySelector(s)?.value?.trim() || '';
-        const body = document.body?.innerText || '';
-        return {
-          microarea:t('#microarea,.microarea-val,[data-microarea]'),
-          acs_nome:t('#nome-acs,.acs-nome-val,[data-acs]'),
-          endereco:t('#endereco,.endereco-val,[data-endereco]'),
-          nome_paciente:t('#nome-paciente,.nome-paciente,[data-nome-paciente]'),
-          telefone:(body.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\d{4}|\d{4})[-.\s]?\d{4}/g)||[]).join(' / '),
-          pec_url:location.href,
-          chave_externa:location.href
-        };
-      }
-    });
-    const d=result||{};
-    const atual=(await chrome.runtime.sendMessage({type:'GET_MAILING'})).mailing;
-    const itens=[...(atual?.itens||[]),d];
-    const dedup=[...new Map(itens.map(x=>[x.chave_externa||x.pec_url,x])).values()];
-    await chrome.runtime.sendMessage({type:'SAVE_MAILING',itens:dedup,contexto:atual?.contexto||{}});
-    status('Registro capturado para o mailing.');
-  } catch(e){ status('Falha: '+e.message); }
+      clearInterval(monitor);
+      $('btnParar').style.display = 'none';
+      $('btnGerar').disabled = !podeGerar; $('btnRetomar').disabled = !podeGerar;
+      status(`${p.current || p.phase}\n${resumo(p)}${p.phase === 'concluido' || p.phase === 'cancelado' ? '\nAgora importe o mailing na página Mailing do Inquérito.' : ''}`);
+    } catch (_) {}
+  }, 1200);
 }
 
 async function carregarContexto() {
@@ -108,6 +110,14 @@ async function carregarContexto() {
 }
 
 $('btnTodos').onclick=()=>document.querySelectorAll('input[name="microarea"]').forEach(x=>x.checked=true);
-$('btnGerar').onclick=executar;
-$('btnPaciente').onclick=capturarPaciente;
-carregarContexto();
+$('btnGerar').onclick=()=>executar(false);
+$('btnRetomar').onclick=()=>executar(true);
+$('btnParar').onclick=async()=>{ await chrome.runtime.sendMessage({type:'STOP_CRAWL'}); status('Parando após a casa atual…'); };
+$('status').style.whiteSpace='pre-line';
+(async()=>{
+  await carregarContexto();
+  await verificarPerfil();
+  // Se a coleta já estiver rodando (popup reaberto), volta a acompanhar
+  const r=await chrome.runtime.sendMessage({type:'GET_CRAWL_PROGRESS'}).catch(()=>null);
+  if(r?.crawlProgress && FASES_ATIVAS.includes(r.crawlProgress.phase)){ $('btnGerar').disabled=true; $('btnRetomar').disabled=true; monitorarColeta(r.crawlProgress.jobId); }
+})();
