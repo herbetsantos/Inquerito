@@ -83,7 +83,20 @@ async function verMailing(c){
  $('detalhe-paginacao').textContent=`Exibindo ${d.itens?.length||0} registros (máximo de 500 nesta visualização).`;
  box.scrollIntoView({behavior:'smooth',block:'start'});
 }
-async function carregar(){const r=await fetch('/api/admin/campanhas');if(!r.ok)return;const d=await r.json();$('tabela').querySelector('tbody').innerHTML=(d.campanhas||[]).map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.unidade||'—')}</td><td>${c.total||0}</td><td>${c.concluidos||0}</td><td>${c.pendentes||0}</td><td>${esc(c.status)}</td><td><button class="btn btn-secondary" type="button" data-campanha="${c.id}">Ver</button> <a class="btn btn-secondary" href="/api/export/mailing.csv?campanha_id=${encodeURIComponent(c.id)}">CSV</a></td></tr>`).join(''); document.querySelectorAll('[data-campanha]').forEach(b=>b.onclick=()=>{const c=(d.campanhas||[]).find(x=>String(x.id)===b.dataset.campanha);if(c)verMailing(c);}); const q=new URLSearchParams(location.search).get('campanha_id'); if(q){const c=(d.campanhas||[]).find(x=>String(x.id)===q);if(c)verMailing(c);}}
+async function excluirCampanha(c){
+ if(!confirm(`Excluir a campanha "${c.nome}" e todos os ${c.total||0} contatos do mailing?\n\nOs dados pessoais do mailing (nome, CNS, CPF, telefone, endereço) serão removidos permanentemente. Recomenda-se exportar o CSV antes, se necessário.`))return;
+ let r=await fetch(`/api/admin/campanhas?id=${encodeURIComponent(c.id)}`,{method:'DELETE'});
+ let d=await r.json().catch(()=>({}));
+ if(r.status===409&&d.requer_confirmacao){
+  if(!confirm(`${d.mensagem}\n\nOs inquéritos continuarão registrados, porém sem vínculo com o contato do mailing. Confirmar a exclusão?`))return;
+  r=await fetch(`/api/admin/campanhas?id=${encodeURIComponent(c.id)}&forcar=true`,{method:'DELETE'});
+  d=await r.json().catch(()=>({}));
+ }
+ if(!r.ok)return msg(d.mensagem||'Erro ao excluir campanha.');
+ $('mailing-detalhe').classList.add('hidden');
+ msg(d.mensagem,true);carregar();
+}
+async function carregar(){const r=await fetch('/api/admin/campanhas');if(!r.ok)return;const d=await r.json();$('tabela').querySelector('tbody').innerHTML=(d.campanhas||[]).map(c=>`<tr><td>${esc(c.nome)}</td><td>${esc(c.unidade||'—')}</td><td>${c.total||0}</td><td>${c.concluidos||0}</td><td>${c.pendentes||0}</td><td>${esc(c.status)}</td><td><button class="btn btn-secondary" type="button" data-campanha="${c.id}">Ver</button> <a class="btn btn-secondary" href="/api/export/mailing.csv?campanha_id=${encodeURIComponent(c.id)}">CSV</a> <button class="btn btn-danger" type="button" data-excluir="${c.id}">Excluir</button></td></tr>`).join(''); document.querySelectorAll('[data-excluir]').forEach(b=>b.onclick=()=>{const c=(d.campanhas||[]).find(x=>String(x.id)===b.dataset.excluir);if(c)excluirCampanha(c);}); document.querySelectorAll('[data-campanha]').forEach(b=>b.onclick=()=>{const c=(d.campanhas||[]).find(x=>String(x.id)===b.dataset.campanha);if(c)verMailing(c);}); const q=new URLSearchParams(location.search).get('campanha_id'); if(q){const c=(d.campanhas||[]).find(x=>String(x.id)===q);if(c)verMailing(c);}}
 $('logout').onclick=async()=>{await fetch('/api/logout',{method:'POST'});location.href='index.html';};
 (async()=>{const r=await fetch('/api/me');const u=await r.json().catch(()=>({}));if(!r.ok||u.perfil!=='admin')location.href='inquerito.html';else carregar();})();
 </script>
