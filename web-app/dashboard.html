@@ -86,6 +86,18 @@
 
   <script>
     function esc(v){ return String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    async function excluirAcompanhamento(r) {
+      const rotulo = `${r.acs_nome} — microárea ${r.microarea}`;
+      if (!confirm(`Excluir os ${r.total} inquérito(s) do acompanhamento "${rotulo}"?\n\nA exclusão é permanente e remove as respostas registradas (as divergências e médias deixam de considerá-las). Recomenda-se exportar o CSV de inquéritos antes.`)) return;
+      const q = new URLSearchParams({ esperado: String(r.total) });
+      if (r.acs_raw == null) q.set('acs_nulo', '1'); else q.set('acs_nome', r.acs_raw);
+      if (r.microarea_raw == null) q.set('microarea_nula', '1'); else q.set('microarea', r.microarea_raw);
+      const res = await fetch('/api/admin/acompanhamentos?' + q.toString(), { method: 'DELETE' });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(d.mensagem || `Erro ao excluir acompanhamento (HTTP ${res.status}).`); return; }
+      alert(d.mensagem);
+      location.reload();
+    }
     document.addEventListener('DOMContentLoaded', async () => {
       const voltar = () => { window.location.href = 'index.html'; };
 
@@ -132,12 +144,20 @@
           document.getElementById('media-satisfacao').innerText = data.mediaSatisfacao ?? '—';
         }
 
+        if (eu.perfil === 'admin') { const th = document.createElement('th'); th.textContent = 'Ação'; document.querySelector('#tabela-gestao thead tr').appendChild(th); }
         const tbody = document.querySelector('#tabela-gestao tbody');
         (data.porAcs || []).forEach((r) => {
           const tr = document.createElement('tr');
           [r.acs_nome, r.microarea, r.total, r.confirmadas, r.divergencias,
            r.media != null ? Number(r.media).toFixed(1) : '—']
             .forEach((v) => { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+          if (eu.perfil === 'admin') {
+            const td = document.createElement('td');
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'btn btn-danger btn-small'; b.textContent = 'Excluir';
+            b.onclick = () => excluirAcompanhamento(r);
+            td.appendChild(b); tr.appendChild(td);
+          }
           tbody.appendChild(tr);
         });
       } catch (err) {

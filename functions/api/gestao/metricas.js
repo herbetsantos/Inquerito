@@ -13,6 +13,7 @@ export async function onRequestGet({ request, env }) {
 
     const { results } = await env.DB.prepare(`
       SELECT COALESCE(acs_nome, '(sem nome)') AS acs_nome, COALESCE(microarea, '-') AS microarea,
+             acs_nome AS acs_raw, microarea AS microarea_raw,
              COUNT(*) AS total,
              SUM(CASE WHEN visita_relatada_paciente = 1 THEN 1 ELSE 0 END) AS confirmadas,
              SUM(CASE WHEN visita_registrada_pec = 1 AND visita_relatada_paciente = 0 THEN 1 ELSE 0 END) AS divergencias,
